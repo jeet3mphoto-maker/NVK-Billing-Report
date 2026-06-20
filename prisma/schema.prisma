@@ -1,0 +1,744 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Authentication ───────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(BILLING_ANALYST)
+  isActive      Boolean   @default(true)
+  centerId      String?
+  center        Center?   @relation(fields: [centerId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  assignedIssues BillingIssue[] @relation("AssignedTo")
+  createdIssues  BillingIssue[] @relation("CreatedBy")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMINISTRATOR
+  FINANCE_MANAGER
+  BILLING_MANAGER
+  CENTER_DIRECTOR
+  CENTER_MANAGER
+  BILLING_ANALYST
+  READ_ONLY
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Master Data ──────────────────────────────────────────────────────────────
+
+model Center {
+  id               String   @id @default(cuid())
+  centerId         String   @unique
+  name             String
+  city             String?
+  state            String?
+  entity           String?
+  address          String?
+  // Points "CORE LOGIC" — weeks-per-month factor used to convert weekly rates
+  // to monthly for this center (e.g. Andover 4.0, most centers 4.33).
+  coreWeeklyFactor Decimal? @db.Decimal(4, 2)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users           User[]
+  children        Child[]
+  enrollments     Enrollment[]
+  transactions    Transaction[]
+  billingFacts    BillingFact[]
+  billingIssues   BillingIssue[]
+  centerSnapshots CenterSnapshot[]
+}
+
+model Program {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrollments  Enrollment[]
+  billingFacts BillingFact[]
+}
+
+model RateType {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Child & Family ───────────────────────────────────────────────────────────
+
+model Family {
+  id         String   @id @default(cuid())
+  familyId   String   @unique
+  name       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  children     Child[]
+  enrollments  Enrollment[]
+  transactions Transaction[]
+  billingFacts BillingFact[]
+}
+
+model Child {
+  id        String   @id @default(cuid())
+  childId   String   @unique
+  firstName String
+  lastName  String
+  fullName  String
+  familyId  String
+  centerId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  center    Center   @relation(fields: [centerId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrollments  Enrollment[]
+  transactions Transaction[]
+  billingFacts BillingFact[]
+  timeline     ChildTimeline[]
+  rateCards    ChildRateCard[]
+}
+
+// ─── Rate Cards ─────────────────────────────────────────────────────────────
+
+model ChildRateCard {
+  id        String    @id @default(cuid())
+  childId   String
+  child     Child     @relation(fields: [childId], references: [id])
+  rate      Decimal   @db.Decimal(10, 2)
+  rateType  String?
+  startDate DateTime  @db.Date
+  endDate   DateTime? @db.Date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([childId, startDate, endDate])
+}
+
+// Center-level rate-card master (the "current rate" source). One row per unique
+// Center + Version + Program + Classroom (+ care times). Matched to each FC28
+// child via rateKey to determine Gross Billing = monthlyFees + earlyAM + latePM.
+model RateCard {
+  id          String   @id @default(cuid())
+  entity      String?
+  state       String?
+  centerName  String
+  centerId    String?
+  version     String?
+  program     String?
+  classroom   String?
+  dropOff     String?
+  latePickup  String?
+  monthlyFees Decimal  @default(0) @db.Decimal(10, 2)
+  earlyAMRate Decimal  @default(0) @db.Decimal(10, 2)
+  latePMRate  Decimal  @default(0) @db.Decimal(10, 2)
+  rateKey     String   // normalized lookup key (center|version|program|classroom)
+  uploadId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([rateKey])
+  @@index([centerName, version, program, classroom])
+}
+
+// ─── Enrollment (FC28) ────────────────────────────────────────────────────────
+
+model Enrollment {
+  id              String    @id @default(cuid())
+  childId         String
+  child           Child     @relation(fields: [childId], references: [id])
+  familyId        String
+  family          Family    @relation(fields: [familyId], references: [id])
+  centerId        String
+  center          Center    @relation(fields: [centerId], references: [id])
+  programId       String?
+  program         Program?  @relation(fields: [programId], references: [id])
+  programCode     String?
+  classroom       String?
+  cleanClassroom  String?   // age-group normalization (Infant/Toddler/Pre-K …)
+  startDate       DateTime
+  endDate         DateTime?
+  status          String    // Child Status: Active / Enrolled / Inactive / Withdrawn
+  familyStatus    String?
+  rate            Decimal?  @db.Decimal(10, 2)
+  rateType        String?
+  schedule        String?
+  subsidyInfo     String?
+  subsidyAmount   Decimal?  @db.Decimal(10, 2)
+  // ── FC28 detail used by the expected-billing engine ──
+  agencyName      String?   // null/N/A = private pay
+  familyContribution     Decimal? @db.Decimal(10, 2)
+  estimatedContractAmount Decimal? @db.Decimal(10, 2)
+  contractPeriod  String?   // Month / Day / Week / N/A
+  estimatedCopayAmount    Decimal? @db.Decimal(10, 2)
+  copayPeriod     String?   // Month / Day / Week / N/A
+  billingCycle    String?   // Monthly / Semi-Monthly / Weekly
+  rateCardVersion String?
+  dropOff         String?
+  pickup          String?
+  earlyAMCare     Boolean?
+  latePMCare      Boolean?
+  dateOfBirth     DateTime?
+  enrollDate      DateTime?
+  withdrawalDate  DateTime?
+  withdrawalReason String?
+  primaryGuardian String?
+  snapshotDate    DateTime
+  isLatest        Boolean   @default(true)
+  rawData         Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([childId, snapshotDate])
+  @@index([centerId, snapshotDate])
+  @@index([isLatest])
+}
+
+// ─── FC28 Snapshot & Change Log ───────────────────────────────────────────────
+
+model FC28Snapshot {
+  id           String   @id @default(cuid())
+  snapshotDate DateTime @db.Date
+  uploadId     String
+  upload       FileUpload @relation(fields: [uploadId], references: [id])
+  recordCount  Int
+  fileName     String
+  createdAt    DateTime @default(now())
+
+  changeLogs   FC28ChangeLog[]
+
+  @@unique([snapshotDate])
+}
+
+model FC28ChangeLog {
+  id           String       @id @default(cuid())
+  snapshotId   String
+  snapshot     FC28Snapshot @relation(fields: [snapshotId], references: [id])
+  childId      String
+  fieldName    String
+  oldValue     String?
+  newValue     String?
+  changeType   ChangeType
+  changeDate   DateTime     @default(now())
+  snapshotDate DateTime
+
+  @@index([childId])
+  @@index([snapshotDate])
+  @@index([changeType])
+}
+
+enum ChangeType {
+  NEW_CHILD
+  REMOVED_CHILD
+  FIELD_CHANGED
+}
+
+// ─── Financial Transactions (FIN14-AR) ────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(cuid())
+  childId         String?
+  child           Child?   @relation(fields: [childId], references: [id])
+  familyId        String
+  family          Family   @relation(fields: [familyId], references: [id])
+  centerId        String?
+  center          Center?  @relation(fields: [centerId], references: [id])
+  transactionDate DateTime @db.Date
+  billingPeriod   String?
+  billingMonth    Int?
+  billingYear     Int?
+  invoiceNumber   String?
+  chargeType      String?  // the FIN14 "Item" text
+  // Categorization (from the Item text), mirroring the May report's FINAR_Raw:
+  majorHead       String?  // Billing / Adjustments
+  subHead         String?  // Regular / Agency / Discount / Early-Late / One Time / Other / Adjustments
+  chargeAmount    Decimal  @default(0) @db.Decimal(10, 2)
+  creditAmount    Decimal  @default(0) @db.Decimal(10, 2)
+  paymentAmount   Decimal  @default(0) @db.Decimal(10, 2)
+  adjustmentAmount Decimal @default(0) @db.Decimal(10, 2)
+  balance         Decimal  @default(0) @db.Decimal(10, 2)
+  uploadId        String?
+  upload          FileUpload? @relation(fields: [uploadId], references: [id])
+  rawData         Json?
+  createdAt       DateTime @default(now())
+
+  @@index([familyId, billingPeriod])
+  @@index([childId, billingPeriod])
+  @@index([centerId])
+}
+
+// ─── Billing Fact Table ────────────────────────────────────────────────────────
+
+model BillingFact {
+  id               String        @id @default(cuid())
+  childId          String
+  child            Child         @relation(fields: [childId], references: [id])
+  familyId         String
+  family           Family        @relation(fields: [familyId], references: [id])
+  centerId         String
+  center           Center        @relation(fields: [centerId], references: [id])
+  programId        String?
+  program          Program?      @relation(fields: [programId], references: [id])
+  billingPeriod    String
+  billingMonth     Int
+  billingYear      Int
+  expectedAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  actualAmount     Decimal       @default(0) @db.Decimal(10, 2)
+  collectedAmount  Decimal       @default(0) @db.Decimal(10, 2)
+  varianceAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  variancePercent  Decimal       @default(0) @db.Decimal(6, 2)
+  leakageAmount    Decimal       @default(0) @db.Decimal(10, 2)
+  attendanceDays   Int           @default(0)
+  absentDays       Int           @default(0)
+  // ── Expected breakdown (from rate card + FC28) ──
+  grossBilling     Decimal       @default(0) @db.Decimal(10, 2) // monthly fees + early + late
+  agencyBilling    Decimal       @default(0) @db.Decimal(10, 2)
+  copayBilling     Decimal       @default(0) @db.Decimal(10, 2)
+  programFeeBilling Decimal      @default(0) @db.Decimal(10, 2)
+  finalDaysBilled  Int           @default(0)
+  finalWeeksBilled Int           @default(0)
+  // ── Actual breakdown (from categorized FIN14) ──
+  actualRegular    Decimal       @default(0) @db.Decimal(10, 2)
+  actualAgency     Decimal       @default(0) @db.Decimal(10, 2)
+  actualDiscount   Decimal       @default(0) @db.Decimal(10, 2)
+  actualEarlyLate  Decimal       @default(0) @db.Decimal(10, 2)
+  actualOneTime    Decimal       @default(0) @db.Decimal(10, 2)
+  actualOther      Decimal       @default(0) @db.Decimal(10, 2)
+  actualAdjustments Decimal      @default(0) @db.Decimal(10, 2)
+  // ── Dimensions (denormalized for filtering) ──
+  entity           String?
+  state            String?
+  agencyName       String?
+  billingCycle     String?
+  enrollmentStatus String?
+  // ── Categorization + comments (comments carry forward, editable) ──
+  billingStatus    BillingStatus   @default(NOT_BILLED)
+  varianceCategory BillingCategory @default(UNCATEGORIZED)
+  remark           String?
+  detailedRemark   String?
+  commentBy        String?
+  commentAt        DateTime?
+  snapshotDate     DateTime
+  calcVersion      String        @default("2.0")
+  calcTimestamp    DateTime      @default(now())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([childId, billingPeriod])
+  @@index([centerId, billingPeriod])
+  @@index([billingStatus])
+}
+
+enum BillingStatus {
+  MATCHED
+  UNDERBILLED
+  OVERBILLED
+  NOT_BILLED
+  PARTIALLY_BILLED
+  ADJUSTMENT_REQUIRED
+  ACTUAL_ONLY // billed, but no expected baseline on file (e.g. private-pay, no contract amount)
+}
+
+// Variance categories used in the Summary analysis (mirrors the May report).
+enum BillingCategory {
+  MATCHED
+  FRACTIONAL_DIFFERENCE
+  SHORT_BILLING
+  EXCESS_BILLING
+  NEW_START
+  BILLING_PENDING
+  PROJECTION_PENDING
+  PLAY_DATE
+  CENTER_WILL_BILL
+  DUAL_AGENCY
+  UNCATEGORIZED
+}
+
+// ─── Monthly Snapshot ─────────────────────────────────────────────────────────
+
+model MonthlySnapshot {
+  id               String   @id @default(cuid())
+  month            Int
+  year             Int
+  billingPeriod    String
+  centerId         String?
+  expectedRevenue  Decimal  @default(0) @db.Decimal(12, 2)
+  actualRevenue    Decimal  @default(0) @db.Decimal(12, 2)
+  collectedRevenue Decimal  @default(0) @db.Decimal(12, 2)
+  outstandingRevenue Decimal @default(0) @db.Decimal(12, 2)
+  varianceAmount   Decimal  @default(0) @db.Decimal(12, 2)
+  credits          Decimal  @default(0) @db.Decimal(12, 2)
+  adjustments      Decimal  @default(0) @db.Decimal(12, 2)
+  leakageAmount    Decimal  @default(0) @db.Decimal(12, 2)
+  activeChildren   Int      @default(0)
+  unbilledChildren Int      @default(0)
+  snapshotDate     DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  @@unique([month, year, centerId])
+}
+
+// ─── Billing Issues & Exceptions ─────────────────────────────────────────────
+
+model BillingIssue {
+  id             String        @id @default(cuid())
+  issueType      IssueType
+  severity       IssueSeverity
+  status         IssueStatus   @default(OPEN)
+  childId        String?
+  familyId       String?
+  centerId       String?
+  center         Center?       @relation(fields: [centerId], references: [id])
+  billingPeriod  String?
+  description    String
+  impactAmount   Decimal?      @db.Decimal(10, 2)
+  leakageCategory String?
+  assignedToId   String?
+  assignedTo     User?         @relation("AssignedTo", fields: [assignedToId], references: [id])
+  createdById    String?
+  createdBy      User?         @relation("CreatedBy", fields: [createdById], references: [id])
+  resolvedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status, severity])
+  @@index([centerId])
+  @@index([issueType])
+}
+
+enum IssueType {
+  MISSING_ENROLLMENT
+  MISSING_INVOICE
+  RATE_MISMATCH
+  CENTER_MISMATCH
+  FAMILY_MISMATCH
+  PROGRAM_MISMATCH
+  ENROLLMENT_GAP
+  DUPLICATE_BILLING
+  DUPLICATE_CHILD
+  FUTURE_BILLING
+  PAST_ENROLLMENT_BILLING
+  REVENUE_LEAKAGE
+  UNDERBILLED
+  OVERBILLED
+}
+
+enum IssueSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IssueStatus {
+  OPEN
+  INVESTIGATING
+  PENDING_REVIEW
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+// ─── File Upload Tracking ─────────────────────────────────────────────────────
+
+model FileUpload {
+  id               String       @id @default(cuid())
+  fileName         String
+  fileType         FileType
+  filePath         String?
+  fileSize         Int?
+  uploadedAt       DateTime     @default(now())
+  processedAt      DateTime?
+  status           UploadStatus @default(PENDING)
+  recordsTotal     Int          @default(0)
+  recordsProcessed Int          @default(0)
+  recordsRejected  Int          @default(0)
+  errorLog         Json?
+  uploadedById     String?
+  snapshotDate     DateTime?    @db.Date
+  centerId         String?
+
+  transactions Transaction[]
+  fc28Snapshots FC28Snapshot[]
+  fin02Rates   Fin02Rate[]
+}
+
+enum FileType {
+  FC28
+  FIN14_AR
+  FIN02
+  FIN14
+}
+
+enum UploadStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+// ─── Child Timeline ───────────────────────────────────────────────────────────
+
+model ChildTimeline {
+  id          String   @id @default(cuid())
+  childId     String
+  child       Child    @relation(fields: [childId], references: [id])
+  eventType   String
+  eventDate   DateTime
+  description String
+  oldValue    String?
+  newValue    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([childId, eventDate])
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entity     String?
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ─── FIN02 Rate Master ───────────────────────────────────────────────────────
+
+model Fin02Rate {
+  id                String    @id @default(cuid())
+  rawFamilyId       String?
+  rawChildId        String?
+  childName         String?
+  centerName        String?
+  program           String?
+  classroom         String?
+  chargeCode        String?
+  chargeDescription String?
+  rateAmount        Decimal   @default(0) @db.Decimal(10, 2)
+  rateFrequency     String?
+  effectiveDate     DateTime? @db.Date
+  endDate           DateTime? @db.Date
+  uploadId          String
+  upload            FileUpload @relation(fields: [uploadId], references: [id])
+  rawData           Json?
+  createdAt         DateTime  @default(now())
+
+  @@index([rawFamilyId])
+  @@index([rawChildId])
+  @@index([uploadId])
+}
+
+// ─── FIN02 × FIN14 × FC28 Reconciliation ────────────────────────────────────
+
+model Fin02Reconciliation {
+  id             String   @id @default(cuid())
+  billingPeriod  String
+  fin02UploadId  String?
+  totalChildren  Int      @default(0)
+  matched        Int      @default(0)
+  rateMismatch   Int      @default(0)
+  missingFin14   Int      @default(0)
+  missingFin02   Int      @default(0)
+  noData         Int      @default(0)
+  notEnrolled    Int      @default(0)
+  runAt          DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  lines Fin02ReconciliationLine[]
+
+  @@index([billingPeriod])
+}
+
+model Fin02ReconciliationLine {
+  id               String              @id @default(cuid())
+  reconciliationId String
+  reconciliation   Fin02Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  childId          String?
+  familyId         String?
+  childName        String?
+  centerName       String?
+  program          String?
+  classroom        String?
+  enrollmentStatus String?
+  billingCycle     String?
+  agencyName       String?
+  fin02Rate        Decimal?            @db.Decimal(10, 2)
+  fin02Frequency   String?
+  fin02ChargeCode  String?
+  fin02Description String?
+  fin14Amount      Decimal?            @db.Decimal(10, 2)
+  fin14TxnCount    Int                 @default(0)
+  expectedAmount   Decimal?            @db.Decimal(10, 2)
+  varianceAmount   Decimal?            @db.Decimal(10, 2)
+  variancePercent  Decimal?            @db.Decimal(6, 2)
+  reconcStatus     String
+  notes            String?
+  createdAt        DateTime            @default(now())
+
+  @@index([reconciliationId])
+  @@index([reconcStatus])
+}
+
+// ─── Center Snapshot ──────────────────────────────────────────────────────────
+
+model CenterSnapshot {
+  id              String   @id @default(cuid())
+  centerId        String
+  center          Center   @relation(fields: [centerId], references: [id])
+  snapshotDate    DateTime @db.Date
+  activeChildren  Int      @default(0)
+  totalEnrollments Int     @default(0)
+  expectedRevenue Decimal  @default(0) @db.Decimal(12, 2)
+  actualRevenue   Decimal  @default(0) @db.Decimal(12, 2)
+  leakageAmount   Decimal  @default(0) @db.Decimal(12, 2)
+  openIssues      Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([centerId, snapshotDate])
+}
+
+// ─── Item Master ──────────────────────────────────────────────────────────────
+
+model ItemMaster {
+  id        Int      @id @default(autoincrement())
+  item      String   // substring search pattern (case-insensitive)
+  majorHead String
+  subHead   String
+  entryBy   String   @default("System")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+// ─── FIN14 Consolidated Batches & Rows ───────────────────────────────────────
+
+model Fin14Batch {
+  id             String     @id @default(cuid())
+  fileCount      Int
+  rowCount       Int
+  matchedCount   Int        @default(0)
+  unmatchedCount Int        @default(0)
+  createdAt      DateTime   @default(now())
+
+  rows Fin14Row[]
+}
+
+model Fin14Row {
+  id        Int        @id @default(autoincrement())
+  batchId   String
+  batch     Fin14Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rawData   Json
+  itemText  String?
+  majorHead String?
+  subHead   String?
+  entryBy   String?
+  isMatched Boolean    @default(false)
+  flaggedBy String?
+  flaggedAt DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([batchId])
+  @@index([isMatched])
+  @@index([itemText])
+}
+
+// ─── FC28 History Records ────────────────────────────────────────────────────
+
+model FC28Record {
+  id                      Int      @id @default(autoincrement())
+  reportDate              DateTime @db.Date        // date parsed from filename
+  childId                 String
+  childName               String?
+  centerId                Int?
+  center                  String?
+  familyId                Int?
+  family                  String?
+  childStatus             String?
+  familyStatus            String?
+  classroom               String?
+  rateSheet               String?
+  dateOfBirth             String?
+  enrollDate              String?
+  startDate               String?
+  program                 String?
+  billingCycle            String?
+  agency                  String?
+  estimatedContractAmount Decimal? @db.Decimal(12, 2)
+  rawData                 Json?    // full original row for future columns
+  syncedAt                DateTime @default(now())
+
+  @@unique([childId, reportDate, centerId])
+  @@index([childId])
+  @@index([reportDate])
+  @@index([centerId])
+  @@index([childStatus])
+}

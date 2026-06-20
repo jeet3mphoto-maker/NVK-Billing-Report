@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local app config (contains machine-specific paths)
+portal-config.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

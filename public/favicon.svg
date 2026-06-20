@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0047a0"/>
+  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" 
+        font-family="Arial, Helvetica, sans-serif" 
+        font-weight="800" 
+        font-size="14" 
+        fill="white" 
+        letter-spacing="-0.5">ASA</text>
+</svg>
