@@ -663,6 +663,24 @@ model CenterSnapshot {
   @@unique([centerId, snapshotDate])
 }
 
+// ─── FIN02 Rate Master (flat, per-child contracted rates) ────────────────────
+
+model RateMasterRow {
+  id         Int      @id @default(autoincrement())
+  center     String   // short name extracted from file header
+  centerFull String   // full header string (e.g. "Hudson Yards 417 West...")
+  childName  String   // "Last, First" exactly as in FIN02
+  payer      String?
+  cycle      String?  // e.g. "Monthly"
+  item       String   // e.g. "Full Time 5 Days - Twaddler"
+  amount     Decimal  @db.Decimal(10, 2)
+  rateSheet  String?  // e.g. "5-9.1.25"
+  uploadedAt DateTime @default(now())
+
+  @@index([center, childName])
+  @@index([center])
+}
+
 // ─── Item Master ──────────────────────────────────────────────────────────────
 
 model ItemMaster {
