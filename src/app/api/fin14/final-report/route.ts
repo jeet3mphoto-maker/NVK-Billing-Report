@@ -60,8 +60,16 @@ const META_COLS = [
 
 export async function GET(req: NextRequest) {
   try {
-    const sp      = new URL(req.url).searchParams;
-    const batchId = sp.get("batchId");
+    const sp             = new URL(req.url).searchParams;
+    let   batchId        = sp.get("batchId");
+
+    // If no batchId supplied, default to the most recently uploaded batch
+    if (!batchId) {
+      const latest = await prisma.$queryRawUnsafe<{ batchId: string }[]>(
+        `SELECT "batchId" FROM "Fin14Row" ORDER BY id DESC LIMIT 1`
+      );
+      batchId = latest[0]?.batchId ?? null;
+    }
 
     // ── 1. Aggregated pivot query (fast — returns ~child×category rows, not all txns) ──
     const batchFilter = batchId ? `AND r."batchId" = $1` : "";
