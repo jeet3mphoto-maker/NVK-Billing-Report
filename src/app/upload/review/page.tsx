@@ -130,6 +130,15 @@ function ReviewPageContent() {
   const initialBatch = sp.get("batchId") ?? "";
 
   const [batchId,       setBatchId]       = useState(initialBatch);
+
+  // When navigating directly (no batchId in URL), resolve the latest uploaded batch
+  useEffect(() => {
+    if (initialBatch) return;
+    fetch("/api/fin14?latestBatch=1")
+      .then(r => r.json())
+      .then(j => { if (j.batchId) setBatchId(j.batchId); })
+      .catch(() => {});
+  }, [initialBatch]);
   const [filterMatched, setFilterMatched] = useState<"all"|"matched"|"unmatched">("all");
   const [filterMajor,   setFilterMajor]   = useState("");
   const [filterSub,     setFilterSub]     = useState("");

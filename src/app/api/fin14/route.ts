@@ -20,9 +20,18 @@ function buildWhere(sp: URLSearchParams | Record<string, string | undefined>) {
   return where;
 }
 
-// GET /api/fin14
+// GET /api/fin14?latestBatch=1  → { batchId }
+// GET /api/fin14                → paginated rows
 export async function GET(req: NextRequest) {
-  const sp       = new URL(req.url).searchParams;
+  const sp = new URL(req.url).searchParams;
+
+  if (sp.get("latestBatch") === "1") {
+    const rows = await prisma.$queryRawUnsafe<{ batchId: string }[]>(
+      `SELECT "batchId" FROM "Fin14Row" ORDER BY id DESC LIMIT 1`
+    );
+    return NextResponse.json({ batchId: rows[0]?.batchId ?? null });
+  }
+
   const page     = Math.max(1, Number(sp.get("page") ?? 1));
   const pageSize = Math.min(200, Math.max(10, Number(sp.get("pageSize") ?? 100)));
   const where    = buildWhere(sp);
