@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import ExcelJS from "exceljs";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 const C = {
@@ -60,8 +60,16 @@ const META_COLS = [
 
 export async function GET(req: NextRequest) {
   try {
-    const sp      = new URL(req.url).searchParams;
-    const batchId = sp.get("batchId");
+    const sp             = new URL(req.url).searchParams;
+    let   batchId        = sp.get("batchId");
+
+    // If no batchId supplied, default to the most recently uploaded batch
+    if (!batchId) {
+      const latest = await prisma.$queryRawUnsafe<{ batchId: string }[]>(
+        `SELECT "batchId" FROM "Fin14Row" ORDER BY id DESC LIMIT 1`
+      );
+      batchId = latest[0]?.batchId ?? null;
+    }
 
     // ── 1. Aggregated pivot query (fast — returns ~child×category rows, not all txns) ──
     const batchFilter = batchId ? `AND r."batchId" = $1` : "";
@@ -117,7 +125,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No FIN14 rows found" }, { status: 404 });
     }
 
-    // ── 2. Slim transactions query for the Transactions sheet ─────────────────
+    // ── 2. Rate Master — contracted rates per (center, childName) ─────────────
+    type RateRow = { center: string; childName: string; amount: string };
+    const rateRows: RateRow[] = await prisma.$queryRawUnsafe(
+      `SELECT center, "childName", SUM(amount)::text AS amount
+       FROM "RateMasterRow"
+       GROUP BY center, "childName"`
+    );
+    // Build lookup: lowercase("center|||childName") → contracted total
+    const rateMap = new Map<string, number>();
+    for (const r of rateRows) {
+      const key = `${r.center.toLowerCase().trim()}|||${r.childName.toLowerCase().trim()}`;
+      rateMap.set(key, parseFloat(r.amount ?? "0") || 0);
+    }
+    const hasRates = rateMap.size > 0;
+
+    // ── 3. Slim transactions query for the Transactions sheet ─────────────────
     type TxnRow = {
       childId:   string | null;
       childName: string | null;
@@ -216,9 +239,12 @@ export async function GET(req: NextRequest) {
       majorTotals[col.major] = (majorTotals[col.major] ?? 0) + v;
     }
 
-    const numMeta = META_COLS.length;
-    const numVal  = allCols.length;
-    const lastCol = numMeta + numVal + 1; // +1 Grand Total
+    const numMeta        = META_COLS.length;
+    const numVal         = allCols.length;
+    const colGrandTotal  = numMeta + numVal + 1;
+    const colContracted  = hasRates ? colGrandTotal + 1 : 0;
+    const colVariance    = hasRates ? colGrandTotal + 2 : 0;
+    const lastCol        = hasRates ? colGrandTotal + 2 : colGrandTotal;
 
     // ── 4. Build workbook ─────────────────────────────────────────────────────
     const wb = new ExcelJS.Workbook();
@@ -235,7 +261,8 @@ export async function GET(req: NextRequest) {
     ws.columns = [
       ...META_COLS.map(c => ({ width: c.width })),
       ...allCols.map(() => ({ width: 13 })),
-      { width: 15 },
+      { width: 15 },                          // Grand Total
+      ...(hasRates ? [{ width: 16 }, { width: 14 }] : []),  // Contracted Rate, Variance
     ];
 
     // Row 1: Title
@@ -310,8 +337,14 @@ export async function GET(req: NextRequest) {
       const c = r9.getCell(numMeta + ci + 1);
       c.value = col.major; c.font = { bold: true, size: 9, color: { argb: C.white } }; c.fill = fill(C.navy); c.alignment = { vertical: "middle", horizontal: "center" }; c.border = medBorder();
     });
-    const gtH1 = r9.getCell(lastCol);
+    const gtH1 = r9.getCell(colGrandTotal);
     gtH1.value = "Grand Total"; gtH1.font = { bold: true, size: 9, color: { argb: C.white } }; gtH1.fill = fill(C.navy); gtH1.alignment = { vertical: "middle", horizontal: "center" }; gtH1.border = medBorder();
+    if (hasRates) {
+      const crH1 = r9.getCell(colContracted);
+      crH1.value = "Contracted Rate"; crH1.font = { bold: true, size: 9, color: { argb: C.white } }; crH1.fill = fill("FF065f46"); crH1.alignment = { vertical: "middle", horizontal: "center" }; crH1.border = medBorder();
+      const vrH1 = r9.getCell(colVariance);
+      vrH1.value = "Variance"; vrH1.font = { bold: true, size: 9, color: { argb: C.white } }; vrH1.fill = fill("FF7c2d12"); vrH1.alignment = { vertical: "middle", horizontal: "center" }; vrH1.border = medBorder();
+    }
 
     // Row 10: Sub Head header
     const r10 = ws.addRow([]); r10.height = 18;
@@ -320,7 +353,11 @@ export async function GET(req: NextRequest) {
       const c = r10.getCell(numMeta + ci + 1);
       c.value = col.sub; c.font = { bold: true, size: 8, color: { argb: C.white } }; c.fill = fill(C.navyLight); c.alignment = { vertical: "middle", horizontal: "center" }; c.border = border("thin");
     });
-    r10.getCell(lastCol).fill = fill(C.navyLight); r10.getCell(lastCol).border = border("thin");
+    r10.getCell(colGrandTotal).fill = fill(C.navyLight); r10.getCell(colGrandTotal).border = border("thin");
+    if (hasRates) {
+      const crH2 = r10.getCell(colContracted); crH2.value = "FIN02 Total"; crH2.font = { bold: true, size: 8, color: { argb: C.white } }; crH2.fill = fill("FF065f46"); crH2.alignment = { vertical: "middle", horizontal: "center" }; crH2.border = border("thin");
+      const vrH2 = r10.getCell(colVariance);   vrH2.value = "Billed − Contract"; vrH2.font = { bold: true, size: 8, color: { argb: C.white } }; vrH2.fill = fill("FF7c2d12"); vrH2.alignment = { vertical: "middle", horizontal: "center" }; vrH2.border = border("thin");
+    }
 
     ws.autoFilter = { from: { row: 9, column: 1 }, to: { row: 9, column: lastCol } };
 
@@ -353,11 +390,29 @@ export async function GET(req: NextRequest) {
         rowTotal += v;
       });
 
-      const gtc = row.getCell(lastCol);
+      const gtc = row.getCell(colGrandTotal);
       gtc.value = rowTotal; gtc.numFmt = "#,##0.00";
       gtc.fill = fill(isAlt ? "FFe0ecff" : C.blue50);
       gtc.font = { bold: true, size: 9, color: { argb: rowTotal < 0 ? C.red : C.navy } };
       gtc.alignment = { vertical: "middle", horizontal: "right" }; gtc.border = border("thin");
+
+      if (hasRates) {
+        const rateKey    = `${meta.center.toLowerCase().trim()}|||${meta.childName.toLowerCase().trim()}`;
+        const contracted = rateMap.get(rateKey) ?? 0;
+        const variance   = rowTotal - contracted;
+
+        const crc = row.getCell(colContracted);
+        crc.value = contracted; crc.numFmt = "#,##0.00";
+        crc.fill = fill(isAlt ? "FFecfdf5" : "FFf0fdf4");
+        crc.font = { bold: true, size: 9, color: { argb: contracted === 0 ? "FFa0aec0" : "FF065f46" } };
+        crc.alignment = { vertical: "middle", horizontal: "right" }; crc.border = border("thin");
+
+        const vrc = row.getCell(colVariance);
+        vrc.value = variance; vrc.numFmt = "#,##0.00";
+        vrc.fill = fill(isAlt ? "FFfff7ed" : "FFfffbeb");
+        vrc.font = { bold: true, size: 9, color: { argb: variance > 0.01 ? "FFdc2626" : variance < -0.01 ? "FF2563eb" : "FF374151" } };
+        vrc.alignment = { vertical: "middle", horizontal: "right" }; vrc.border = border("thin");
+      }
 
       dataRow++;
     }
@@ -375,10 +430,30 @@ export async function GET(req: NextRequest) {
       c.font = { bold: true, size: 9, color: { argb: C.white } };
       c.alignment = { vertical: "middle", horizontal: "right" }; c.border = medBorder();
     });
-    const totGT = rTot.getCell(lastCol);
+    const totGT = rTot.getCell(colGrandTotal);
     totGT.value = grandTotal; totGT.numFmt = "#,##0.00"; totGT.fill = fill(C.navyDark);
     totGT.font = { bold: true, size: 10, color: { argb: C.white } };
     totGT.alignment = { vertical: "middle", horizontal: "right" }; totGT.border = medBorder();
+
+    if (hasRates) {
+      // Sum all contracted rates across children in this report
+      let totalContracted = 0;
+      for (const [, { meta }] of sorted) {
+        const key = `${meta.center.toLowerCase().trim()}|||${meta.childName.toLowerCase().trim()}`;
+        totalContracted += rateMap.get(key) ?? 0;
+      }
+      const totalVariance = grandTotal - totalContracted;
+
+      const totCR = rTot.getCell(colContracted);
+      totCR.value = totalContracted; totCR.numFmt = "#,##0.00"; totCR.fill = fill("FF064e3b");
+      totCR.font = { bold: true, size: 10, color: { argb: C.white } };
+      totCR.alignment = { vertical: "middle", horizontal: "right" }; totCR.border = medBorder();
+
+      const totVR = rTot.getCell(colVariance);
+      totVR.value = totalVariance; totVR.numFmt = "#,##0.00"; totVR.fill = fill("FF7c2d12");
+      totVR.font = { bold: true, size: 10, color: { argb: C.white } };
+      totVR.alignment = { vertical: "middle", horizontal: "right" }; totVR.border = medBorder();
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SHEET 2 — Transactions (raw rows, numeric Amount, for drill-down)
@@ -405,31 +480,18 @@ export async function GET(req: NextRequest) {
 
     ws2.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: txnHeaders.length } };
 
-    let txnRow = 2;
-    for (const r of txnRows) {
-      const amt    = parseMoney(r.amount);
-      const isAlt  = txnRow % 2 === 0;
-      const rowFill = fill(isAlt ? C.altRow : C.white);
-      const row2   = ws2.addRow([
-        isNaN(Number(r.childId)) ? (r.childId ?? "") : Number(r.childId),
-        r.childName  ?? "",
-        r.center     ?? "",
-        r.item       ?? "",
-        amt,
-        r.majorHead  ?? "",
-        r.subHead    ?? "",
-      ]);
-      row2.height = 15;
-      row2.eachCell((cell, col) => {
-        cell.fill      = rowFill;
-        cell.font      = { size: 9 };
-        cell.border    = border("hair");
-        if (col === 5) { cell.numFmt = "#,##0.00"; cell.alignment = { horizontal: "right" }; if (amt < 0) cell.font = { size: 9, color: { argb: C.red } }; }
-        else if (col === 1) { cell.alignment = { horizontal: "right" }; }
-        else { cell.alignment = { horizontal: "left", indent: 1 }; }
-      });
-      txnRow++;
-    }
+    // Bulk-insert all transaction rows — avoids per-cell overhead on 200k+ rows
+    ws2.addRows(txnRows.map(r => [
+      isNaN(Number(r.childId)) ? (r.childId ?? "") : Number(r.childId),
+      r.childName ?? "",
+      r.center    ?? "",
+      r.item      ?? "",
+      parseMoney(r.amount),
+      r.majorHead ?? "",
+      r.subHead   ?? "",
+    ]));
+    // Style the Amount column (col E) for the whole sheet
+    ws2.getColumn(5).numFmt = "#,##0.00";
 
     // ── Generate & respond ────────────────────────────────────────────────────
     const buf      = await wb.xlsx.writeBuffer();

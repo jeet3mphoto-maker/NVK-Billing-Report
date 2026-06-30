@@ -129,7 +129,7 @@ function ReviewPageContent() {
   const sp = useSearchParams();
   const initialBatch = sp.get("batchId") ?? "";
 
-  const [batchId,       setBatchId]       = useState(initialBatch);
+  const [batchId, setBatchId] = useState(initialBatch);
   const [filterMatched, setFilterMatched] = useState<"all"|"matched"|"unmatched">("all");
   const [filterMajor,   setFilterMajor]   = useState("");
   const [filterSub,     setFilterSub]     = useState("");
@@ -273,6 +273,8 @@ function ReviewPageContent() {
       const res  = await fetch(`/api/fin14?${p}`);
       const json = await res.json();
       setData(json);
+      // Sync the resolved batchId back so Map FC28 / Flag All use the correct batch
+      if (json.batchId && !batchId) setBatchId(json.batchId);
       setSelected(new Set());
     } finally { setLoading(false); }
   }, [batchId, filterMatched, filterMajor, filterSub, itemSearch, page]);
