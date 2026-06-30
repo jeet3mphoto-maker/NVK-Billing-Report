@@ -327,8 +327,11 @@ function ReviewPageContent() {
     } finally { setFlagAllSaving(false); }
   };
 
-  // Determine all columns to show from first row's rawData
-  const rawCols: string[] = data?.rows[0] ? Object.keys(data.rows[0].rawData) : [];
+  // Collect all unique rawData keys across every row on this page so FC28
+  // columns appear even when only some rows have been mapped.
+  const rawCols: string[] = data?.rows.length
+    ? Array.from(new Set(data.rows.flatMap(r => Object.keys(r.rawData))))
+    : [];
 
   // Formula: ASA if SubHead=Adjustments AND item contains "ASA " / "ASA_" / "ASA-"
   function computeEntryBy(itemText: string | null, subHead: string | null): string {
