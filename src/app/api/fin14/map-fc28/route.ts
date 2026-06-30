@@ -75,14 +75,54 @@ export async function POST(req: NextRequest) {
             const fc28 = fc28Map.get(childId);
             if (!fc28) { unmapped++; continue; }
 
+            // All FC28 fields except those already in FIN14 rawData
+            // (Child ID = join key, Child Name, Center, Family Name, Family ID are repetitive)
+            const b = (v: boolean | null | undefined) => v == null ? "" : v ? "Yes" : "No";
+            const s = (v: any) => v ?? "";
             const patch = {
-              "Billing Cycle (FC28)":   fc28.billingCycle    ?? "",
-              "Child Status (FC28)":    fc28.childStatus     ?? "",
-              "Start Date (FC28)":      fc28.startDate       ?? "",
-              "Withdrawal Date (FC28)": fc28.withdrawalDate  ?? "",
-              "Family Status (FC28)":   fc28.familyStatus    ?? "",
-              "Classroom (FC28)":       fc28.classroom       ?? "",
-              "Date of Birth (FC28)":   fc28.dateOfBirth     ?? "",
+              "Child Status (FC28)":       s(fc28.childStatus),
+              "Family Status (FC28)":      s(fc28.familyStatus),
+              "Classroom (FC28)":          s(fc28.classroom),
+              "Rate Sheet (FC28)":         s(fc28.rateSheet),
+              "Date of Birth (FC28)":      s(fc28.dateOfBirth),
+              "Enroll Date (FC28)":        s(fc28.enrollDate),
+              "Start Date (FC28)":         s(fc28.startDate),
+              "Withdrawal Date (FC28)":    s(fc28.withdrawalDate),
+              "Withdrawal Reason (FC28)":  s(fc28.withdrawalReason),
+              "Primary Guardian (FC28)":   s(fc28.primaryGuardian),
+              "Mon (FC28)":                b(fc28.monDay),
+              "Tue (FC28)":                b(fc28.tueDay),
+              "Wed (FC28)":                b(fc28.wedDay),
+              "Thu (FC28)":                b(fc28.thuDay),
+              "Fri (FC28)":                b(fc28.friDay),
+              "Drop Off (FC28)":           s(fc28.dropOff),
+              "Pickup (FC28)":             s(fc28.pickup),
+              "Early AM Care (FC28)":      s(fc28.earlyAMCare),
+              "Late PM Care (FC28)":       s(fc28.latePMCare),
+              "Program (FC28)":            s(fc28.program),
+              "Address 1 (FC28)":          s(fc28.address1),
+              "Address 2 (FC28)":          s(fc28.address2),
+              "City (FC28)":               s(fc28.city),
+              "State (FC28)":              s(fc28.state),
+              "Zip Code (FC28)":           s(fc28.zipCode),
+              "Discount Type (FC28)":      s(fc28.discountType),
+              "Discount Name (FC28)":      s(fc28.discountName),
+              "Main Discount (FC28)":      s(fc28.mainDiscount),
+              "AM/PM Discount (FC28)":     s(fc28.amPmDiscount),
+              "Total Discount (FC28)":     s(fc28.totalDiscount),
+              "Billing Cycle (FC28)":      s(fc28.billingCycle),
+              "Agency 1 (FC28)":           s(fc28.agency1),
+              "Family Contrib 1 (FC28)":   s(fc28.familyContrib1),
+              "Contract Amt 1 (FC28)":     s(fc28.contractAmt1),
+              "Contract Period 1 (FC28)":  s(fc28.contractPeriod1),
+              "Copay Amt 1 (FC28)":        s(fc28.copayAmt1),
+              "Copay Period 1 (FC28)":     s(fc28.copayPeriod1),
+              "Agency 2 (FC28)":           s(fc28.agency2),
+              "Family Contrib 2 (FC28)":   s(fc28.familyContrib2),
+              "Contract Amt 2 (FC28)":     s(fc28.contractAmt2),
+              "Contract Period 2 (FC28)":  s(fc28.contractPeriod2),
+              "Copay Amt 2 (FC28)":        s(fc28.copayAmt2),
+              "Copay Period 2 (FC28)":     s(fc28.copayPeriod2),
             };
 
             valueParts.push(`($${pi}::text, $${pi + 1}::jsonb)`);
