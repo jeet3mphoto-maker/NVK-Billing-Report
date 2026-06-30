@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const db = prisma as any;
 
@@ -85,59 +85,42 @@ export async function GET(req: NextRequest) {
 
     if (!rows.length) return NextResponse.json({ error: "No rows found for this batch" }, { status: 404 });
 
-    // Build Excel
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("FC28 Data", {
-      views: [{ state: "frozen", xSplit: 0, ySplit: 1 }],
-    });
+    const batch   = await db.fC28Batch.findUnique({ where: { id: batchId } });
+    const dateStr = batch?.reportDate
+      ? new Date(batch.reportDate).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
 
-    const navy  = "FF003887";
-    const white = "FFFFFFFF";
-
-    ws.columns = validCols.map(c => ({
-      width: c.key === "childName" || c.key === "familyName" ? 24
-           : c.key.includes("program") || c.key.includes("Guardian") ? 28
-           : c.key === "center" ? 22
-           : c.key.includes("Day") ? 6
-           : 14,
-    }));
-
-    // Header row
-    const hRow = ws.addRow(validCols.map(c => c.label));
-    hRow.height = 18;
-    hRow.eachCell(cell => {
-      cell.font      = { bold: true, size: 9, color: { argb: white } };
-      cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: navy } };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-    });
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: validCols.length } };
-
-    // Data rows — bulk insert
-    const dataRows = rows.map((r: any) =>
-      validCols.map(c => {
+    // Build worksheet data: header + rows
+    const header = validCols.map(c => c.label);
+    const data: any[][] = [header];
+    for (const r of rows) {
+      data.push(validCols.map(c => {
         const v = r[c.key];
         if (v === null || v === undefined) return "";
         if (typeof v === "boolean") return v ? "Yes" : "No";
         return v;
-      })
-    );
-    ws.addRows(dataRows);
+      }));
+    }
 
-    // Style amount columns
-    const amtKeys = ["contractAmt1", "contractAmt2", "copayAmt1", "copayAmt2",
-                     "mainDiscount", "amPmDiscount", "totalDiscount", "familyContrib1", "familyContrib2"];
-    validCols.forEach((c, i) => {
-      if (amtKeys.includes(c.key)) ws.getColumn(i + 1).numFmt = "#,##0.00";
-    });
+    const ws  = XLSX.utils.aoa_to_sheet(data);
+    const wb  = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "FC28 Data");
 
-    const buf      = await wb.xlsx.writeBuffer();
-    const batch    = await db.fC28Batch.findUnique({ where: { id: batchId } });
-    const dateStr  = batch?.reportDate
-      ? new Date(batch.reportDate).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+    // Column widths
+    ws["!cols"] = validCols.map(c => ({
+      wch: c.key === "childName" || c.key === "familyName" ? 24
+         : c.key === "center" || c.key.includes("reason") || c.key.includes("Guardian") ? 28
+         : c.key.includes("Day") ? 6
+         : 14,
+    }));
+
+    // Freeze header row
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const buf      = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     const filename = `FC28_${dateStr}.xlsx`;
 
-    return new NextResponse(buf as Buffer, {
+    return new NextResponse(buf, {
       headers: {
         "Content-Type":        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,
