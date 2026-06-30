@@ -741,7 +741,81 @@ model Fin14Row {
   @@index([itemText])
 }
 
-// ─── FC28 History Records ────────────────────────────────────────────────────
+// ─── FC28 Upload Batches & Rows (new multi-center format) ───────────────────
+
+model FC28Batch {
+  id         String     @id @default(cuid())
+  reportDate DateTime   @db.Date
+  fileCount  Int        @default(0)
+  rowCount   Int        @default(0)
+  createdAt  DateTime   @default(now())
+  rows       FC28Row[]
+
+  @@index([reportDate])
+}
+
+model FC28Row {
+  id               Int       @id @default(autoincrement())
+  batchId          String
+  batch            FC28Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sourceFile       String?
+  center           String?
+  centerId         String?
+  familyName       String?
+  familyId         String?
+  childStatus      String?
+  familyStatus     String?
+  classroom        String?
+  childName        String?
+  childId          String?
+  rateSheet        String?
+  dateOfBirth      String?
+  enrollDate       String?
+  startDate        String?
+  withdrawalDate   String?
+  withdrawalReason String?
+  primaryGuardian  String?
+  monDay           Boolean?
+  tueDay           Boolean?
+  wedDay           Boolean?
+  thuDay           Boolean?
+  friDay           Boolean?
+  address1         String?
+  address2         String?
+  city             String?
+  state            String?
+  zipCode          String?
+  program          String?
+  dropOff          String?
+  pickup           String?
+  earlyAMCare      String?
+  latePMCare       String?
+  discountType     String?
+  discountName     String?
+  mainDiscount     String?
+  amPmDiscount     String?
+  totalDiscount    String?
+  billingCycle     String?
+  agency1          String?
+  familyContrib1   String?
+  contractAmt1     String?
+  contractPeriod1  String?
+  copayAmt1        String?
+  copayPeriod1     String?
+  agency2          String?
+  familyContrib2   String?
+  contractAmt2     String?
+  contractPeriod2  String?
+  copayAmt2        String?
+  copayPeriod2     String?
+  createdAt        DateTime  @default(now())
+
+  @@index([batchId])
+  @@index([childId])
+  @@index([center])
+}
+
+// ─── FC28 History Records (legacy — kept for old data) ───────────────────────
 
 model FC28Record {
   id                      Int      @id @default(autoincrement())

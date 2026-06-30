@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Upload, Users, DollarSign,
   AlertTriangle, FileText, Settings, Building2, BarChart3,
-  GitCompare, Search, Bell, ChevronDown, ChevronRight, Activity, BookOpen
+  GitCompare, Search, Bell, ChevronDown, ChevronRight, Activity, BookOpen, Database
 } from "lucide-react";
 import { useState } from "react";
 
@@ -21,6 +21,7 @@ const nav = [
       { href: "/upload/review", label: "Review & Flag" },
     ],
   },
+  { href: "/fc28",                   icon: Database, label: "FC28 Enrollment" },
   { href: "/admin/item-master",     icon: BookOpen, label: "Item Master" },
   { href: "/admin/asa-employees",   icon: Users,    label: "ASA Employees" },
 ];

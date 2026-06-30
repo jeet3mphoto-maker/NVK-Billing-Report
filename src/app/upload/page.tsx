@@ -766,9 +766,6 @@ export default function UploadPage() {
           </div>
         </div>
 
-        {/* FC28 History — inline card */}
-        <FC28HistoryCard />
-
         <Step1 onDone={(bid) => { setStep1Done(true); }} />
         <Step2 locked={false} />
         <Step3 locked={true} />

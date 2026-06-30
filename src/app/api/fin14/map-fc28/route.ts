@@ -41,12 +41,14 @@ export async function POST(req: NextRequest) {
 
         controller.enqueue(sse({ phase: "init", message: `Found ${total} unique children — loading FC28 data…`, total }));
 
-        // 2. Load ALL FC28 latest records in one query
-        const fc28Records = await db.fC28Record.findMany({
-          where:    { childId: { in: childIds } },
-          orderBy:  { reportDate: "desc" },
-          distinct: ["childId"],
-        });
+        // 2. Find latest FC28 batch, then load its rows
+        const latestBatch = await db.fC28Batch.findFirst({ orderBy: { reportDate: "desc" } });
+        const fc28Records = latestBatch
+          ? await db.fC28Row.findMany({
+              where:   { batchId: latestBatch.id, childId: { in: childIds } },
+              orderBy: { childId: "asc" },
+            })
+          : [];
 
         const fc28Map = new Map<string, any>(fc28Records.map((r: any) => [String(r.childId), r]));
 
@@ -73,19 +75,14 @@ export async function POST(req: NextRequest) {
             const fc28 = fc28Map.get(childId);
             if (!fc28) { unmapped++; continue; }
 
-            const withdrawalDate =
-              fc28.childStatus && fc28.childStatus.toLowerCase() !== "active"
-                ? fc28.reportDate.toISOString().slice(0, 10)
-                : "";
-
             const patch = {
-              "Billing Cycle (FC28)":   fc28.billingCycle   ?? "",
-              "Child Status (FC28)":    fc28.childStatus    ?? "",
-              "Start Date (FC28)":      fc28.startDate      ?? "",
-              "Withdrawal Date (FC28)": withdrawalDate,
-              "Family Status (FC28)":   fc28.familyStatus   ?? "",
-              "Classroom (FC28)":       fc28.classroom      ?? "",
-              "Date of Birth (FC28)":   fc28.dateOfBirth    ?? "",
+              "Billing Cycle (FC28)":   fc28.billingCycle    ?? "",
+              "Child Status (FC28)":    fc28.childStatus     ?? "",
+              "Start Date (FC28)":      fc28.startDate       ?? "",
+              "Withdrawal Date (FC28)": fc28.withdrawalDate  ?? "",
+              "Family Status (FC28)":   fc28.familyStatus    ?? "",
+              "Classroom (FC28)":       fc28.classroom       ?? "",
+              "Date of Birth (FC28)":   fc28.dateOfBirth     ?? "",
             };
 
             valueParts.push(`($${pi}::text, $${pi + 1}::jsonb)`);
