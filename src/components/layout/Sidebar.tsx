@@ -12,46 +12,22 @@ import {
 import { useState } from "react";
 
 const nav = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Executive Dashboard" },
+  { href: "/dashboard",             icon: LayoutDashboard, label: "Executive Dashboard" },
   {
     icon: Upload,
     label: "File Upload",
     children: [
-      { href: "/upload", label: "Upload Files" },
+      { href: "/upload",        label: "Upload Files" },
       { href: "/upload/review", label: "Review & Flag" },
     ],
   },
-  {
-    icon: DollarSign,
-    label: "Billing",
-    children: [
-      { href: "/billing/reconciliation", label: "Reconciliation" },
-      { href: "/billing/expected", label: "Expected Billing" },
-      { href: "/billing/actual", label: "Actual Billing" },
-      { href: "/billing/leakage", label: "Revenue Leakage" },
-      { href: "/billing/workflow", label: "Workflow" },
-    ],
-  },
-  {
-    icon: BarChart3,
-    label: "Analytics",
-    children: [
-      { href: "/analytics/revenue", label: "Revenue Analytics" },
-      { href: "/analytics/performance", label: "Center Performance" },
-      { href: "/analytics/forecasting", label: "Forecasting" },
-    ],
-  },
-  { href: "/children", icon: Users, label: "Children (360°)" },
-  { href: "/changes", icon: GitCompare, label: "FC28 Changes" },
-  { href: "/exceptions", icon: AlertTriangle, label: "Exceptions" },
-  { href: "/reports/billing", icon: FileText, label: "Billing Report" },
-  { href: "/admin/rates", icon: BookOpen, label: "Rate Cards" },
-  { href: "/admin/item-master", icon: BookOpen, label: "Item Master" },
+  { href: "/admin/item-master",     icon: BookOpen, label: "Item Master" },
+  { href: "/admin/asa-employees",   icon: Users,    label: "ASA Employees" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState<string[]>(["Billing", "Analytics", "File Upload"]);
+  const [expanded, setExpanded] = useState<string[]>(["File Upload"]);
 
   function toggle(label: string) {
     setExpanded((prev) =>

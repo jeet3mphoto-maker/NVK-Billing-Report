@@ -28,24 +28,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "No data rows provided" }, { status: 400 });
     }
 
-    // Load item master once per request
+    // Load item master + ASA employee list once per request
     let masters: { id: number; item: string; majorHead: string; subHead: string }[] = [];
+    let asaNames: Set<string> = new Set();
     try {
       masters = await (prisma as any).itemMaster.findMany({ where: { isActive: true } });
     } catch { /* table may not exist yet */ }
+    try {
+      const emps: { name: string }[] = await (prisma as any).asaEmployee.findMany({ where: { isActive: true }, select: { name: true } });
+      asaNames = new Set(emps.map((e) => e.name.trim().toLowerCase()));
+    } catch { /* table may not exist yet */ }
 
-    const headerKeys = Object.keys(incomingRows[0] ?? {});
-    const itemCol    = headerKeys.find((k) => k.trim().toLowerCase() === "item") ?? null;
+    const headerKeys  = Object.keys(incomingRows[0] ?? {});
+    const itemCol     = headerKeys.find((k) => k.trim().toLowerCase() === "item") ?? null;
+    const createdByCol = headerKeys.find((k) => k.trim().toLowerCase() === "created by") ?? null;
 
     const dbRows = incomingRows.map((row) => {
-      const txnItem = itemCol ? String(row[itemCol] ?? "").trim() : "";
-      const match   = txnItem ? matchItem(txnItem, masters) : null;
+      const txnItem   = itemCol      ? String(row[itemCol]      ?? "").trim() : "";
+      const createdBy = createdByCol ? String(row[createdByCol] ?? "").trim() : "";
+      const match     = txnItem ? matchItem(txnItem, masters) : null;
+      // entryBy: if item matched → "System"; else check Created By against ASA employee master
+      let entryBy: string | null = null;
+      if (match) {
+        entryBy = "System";
+      } else if (createdBy) {
+        entryBy = asaNames.has(createdBy.toLowerCase()) ? "ASA" : "Center";
+      }
       return {
         rawData:   row,
         itemText:  txnItem || null,
         majorHead: match?.majorHead ?? null,
         subHead:   match?.subHead   ?? null,
-        entryBy:   match ? "System" : null,
+        entryBy,
         isMatched: !!match,
       };
     });

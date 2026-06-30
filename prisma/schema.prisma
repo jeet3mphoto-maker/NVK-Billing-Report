@@ -663,6 +663,36 @@ model CenterSnapshot {
   @@unique([centerId, snapshotDate])
 }
 
+// ─── FIN02 Rate Master (flat, per-child contracted rates) ────────────────────
+
+model RateMasterRow {
+  id         Int      @id @default(autoincrement())
+  center     String
+  centerFull String
+  childName  String
+  payer      String?
+  cycle      String?
+  item       String
+  amount     Decimal  @db.Decimal(10, 2)
+  rateSheet  String?
+  uploadedAt DateTime @default(now())
+
+  @@index([center, childName])
+  @@index([center])
+}
+
+// ─── ASA Employee Master ──────────────────────────────────────────────────────
+
+model AsaEmployee {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
 // ─── Item Master ──────────────────────────────────────────────────────────────
 
 model ItemMaster {
