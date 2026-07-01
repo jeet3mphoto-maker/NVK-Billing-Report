@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 const db = prisma as any;
 
 // DELETE /api/fc28/batches/[id]
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     // FC28Row cascade-deletes via onDelete: Cascade in schema
