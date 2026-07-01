@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   CheckCircle2, XCircle, RefreshCw, Search, Filter,
   Save, ChevronLeft, ChevronRight, Pencil, X, Download,
-  GitMerge, FileBarChart2, Upload, FileSpreadsheet, Trash2,
+  GitMerge, FileBarChart2, Upload, FileSpreadsheet, Trash2, Receipt,
 } from "lucide-react";
 
 const MAJOR_HEADS = ["Adjustments", "Billing", "Payment"];
@@ -345,6 +345,13 @@ export default function Fin14Page() {
     phase: string; done: number; total: number; mapped: number; unmapped: number; pct: number; message?: string;
   } | null>(null);
 
+  // Map Rate Sheet
+  const [mappingRS,     setMappingRS]     = useState(false);
+  const [mapResultRS,   setMapResultRS]   = useState<string | null>(null);
+  const [mapProgressRS, setMapProgressRS] = useState<{
+    phase: string; done: number; total: number; mapped: number; unmapped: number; pct: number; message?: string;
+  } | null>(null);
+
   // Final Report
   const [reporting, setReporting] = useState(false);
 
@@ -468,6 +475,43 @@ export default function Fin14Page() {
     }
   };
 
+  const mapRateSheet = async () => {
+    setMappingRS(true); setMapResultRS(null); setMapProgressRS(null);
+    try {
+      const res    = await fetch("/api/fin14/map-rate-sheet", { method: "POST" });
+      const reader = res.body!.getReader();
+      const dec    = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.replace(/^data: /, "").trim();
+          if (!line) continue;
+          try {
+            const ev = JSON.parse(line);
+            if (ev.phase === "complete") {
+              setMapResultRS(`✓ ${ev.mapped} matched, ${ev.unmapped} not in Rate Sheet`);
+              setMapProgressRS({ ...ev, done: ev.total, pct: 100 });
+              await load();
+            } else if (ev.phase === "error") {
+              setMapResultRS(`Error: ${ev.message}`);
+            } else {
+              setMapProgressRS(ev);
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setMapResultRS(`Error: ${e.message}`);
+    } finally {
+      setMappingRS(false);
+    }
+  };
+
   const generateFinalReport = async () => {
     setReporting(true);
     try {
@@ -568,6 +612,14 @@ export default function Fin14Page() {
             </button>
 
             <button
+              onClick={mapRateSheet}
+              disabled={mappingRS || !data?.total}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-40 transition-colors"
+            >
+              <Receipt className="w-3.5 h-3.5" />Map Rate Sheet
+            </button>
+
+            <button
               onClick={generateFinalReport}
               disabled={reporting || !data?.total}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-40 transition-colors"
@@ -576,7 +628,52 @@ export default function Fin14Page() {
                 ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Generating…</>
                 : <><FileBarChart2 className="w-3.5 h-3.5" />Final Report</>}
             </button>
+
+            <button
+              onClick={exportExcel}
+              disabled={downloading || !data?.total}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            >
+              {downloading
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Downloading…</>
+                : <><Download className="w-3.5 h-3.5" />Download Excel</>}
+            </button>
           </div>
+
+          {/* Rate Sheet mapping progress */}
+          {(mappingRS || mapResultRS) && (
+            <div className="w-full mt-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-teal-800">
+                <span className="flex items-center gap-1.5">
+                  {mappingRS
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-500" /> Mapping Rate Sheet → FIN14…</>
+                    : mapResultRS?.startsWith("✓")
+                      ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Rate Sheet mapping complete</>
+                      : <><XCircle className="w-3.5 h-3.5 text-red-500" /> {mapResultRS}</>}
+                </span>
+                {mapProgressRS && mapProgressRS.total > 0 && (
+                  <span className="text-teal-600 font-mono">
+                    {mapProgressRS.done.toLocaleString()} / {mapProgressRS.total.toLocaleString()} · {mapProgressRS.pct}%
+                  </span>
+                )}
+              </div>
+              {mapProgressRS && mapProgressRS.total > 0 && (
+                <div className="w-full bg-teal-200 rounded-full h-2 overflow-hidden">
+                  <div className="h-2 rounded-full transition-all duration-150"
+                    style={{ width: `${mapProgressRS.pct}%`, background: mapProgressRS.phase === "complete" ? "#22c55e" : "#0d9488" }} />
+                </div>
+              )}
+              {mapProgressRS && mapProgressRS.total > 0 && (
+                <div className="flex items-center gap-4 text-xs text-teal-700">
+                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-500" /><span className="font-semibold text-green-700">{mapProgressRS.mapped.toLocaleString()}</span> matched</span>
+                  <span className="flex items-center gap-1"><XCircle className="w-3 h-3 text-gray-400" /><span className="font-semibold text-gray-500">{mapProgressRS.unmapped.toLocaleString()}</span> not in Rate Sheet</span>
+                  {mapResultRS && mapProgressRS.phase === "complete" && (
+                    <button onClick={() => { setMapResultRS(null); setMapProgressRS(null); }} className="ml-auto text-teal-400 hover:text-teal-600 text-xs">Dismiss</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* FC28 mapping progress */}
           {(mapping || mapResult) && (
