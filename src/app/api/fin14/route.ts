@@ -22,6 +22,7 @@ function buildWhere(sp: URLSearchParams | Record<string, string | undefined>) {
 
 // GET /api/fin14?latestBatch=1  → { batchId }
 // GET /api/fin14                → paginated rows (defaults to latest batch)
+// Supports rf_COLUMNNAME=value for rawData JSONB column filters (case-insensitive contains)
 export async function GET(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
 
@@ -41,13 +42,54 @@ export async function GET(req: NextRequest) {
     batchId = latest[0]?.batchId ?? null;
   }
 
-  // Rebuild URLSearchParams with the resolved batchId for buildWhere
-  const resolved = new URLSearchParams(sp);
-  if (batchId) resolved.set("batchId", batchId);
-
   const page     = Math.max(1, Number(sp.get("page") ?? 1));
   const pageSize = Math.min(200, Math.max(10, Number(sp.get("pageSize") ?? 100)));
-  const where    = buildWhere(resolved);
+
+  // Collect rawData column filters (rf_COLUMNNAME=value)
+  const rawFilters: Record<string, string> = {};
+  for (const [key, val] of sp.entries()) {
+    if (key.startsWith("rf_") && val.trim()) rawFilters[key.slice(3)] = val.trim();
+  }
+
+  // If rawData filters present, use raw SQL for JSONB ILIKE support
+  if (Object.keys(rawFilters).length > 0) {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pi = 1;
+
+    if (batchId) { conditions.push(`"batchId" = $${pi++}`); params.push(batchId); }
+
+    const isMatched = sp.get("isMatched");
+    if (isMatched === "true")  { conditions.push(`"isMatched" = $${pi++}`); params.push(true); }
+    if (isMatched === "false") { conditions.push(`"isMatched" = $${pi++}`); params.push(false); }
+    const majorHead = sp.get("majorHead");
+    if (majorHead) { conditions.push(`"majorHead" = $${pi++}`); params.push(majorHead); }
+    const subHead = sp.get("subHead");
+    if (subHead) { conditions.push(`"subHead" = $${pi++}`); params.push(subHead); }
+    const itemSearch = sp.get("itemSearch");
+    if (itemSearch) { conditions.push(`"itemText" ILIKE $${pi++}`); params.push(`%${itemSearch}%`); }
+
+    for (const [col, val] of Object.entries(rawFilters)) {
+      conditions.push(`LOWER("rawData"->>'${col.replace(/'/g, "''")}') LIKE LOWER($${pi++})`);
+      params.push(`%${val}%`);
+    }
+
+    const whereSQL = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const offset   = (page - 1) * pageSize;
+
+    const [countRes, rows] = await Promise.all([
+      prisma.$queryRawUnsafe<{ count: bigint }[]>(`SELECT COUNT(*) AS count FROM "Fin14Row" ${whereSQL}`, ...params),
+      prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Fin14Row" ${whereSQL} ORDER BY id ASC LIMIT ${pageSize} OFFSET ${offset}`, ...params),
+    ]);
+
+    const total = Number(countRes[0]?.count ?? 0);
+    return NextResponse.json({ total, page, pageSize, rows, batchId });
+  }
+
+  // Standard Prisma path (no rawData filters)
+  const resolved = new URLSearchParams(sp);
+  if (batchId) resolved.set("batchId", batchId);
+  const where = buildWhere(resolved);
 
   const [total, rows] = await Promise.all([
     db.fin14Row.count({ where }),

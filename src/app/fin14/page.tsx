@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   CheckCircle2, XCircle, RefreshCw, Search, Filter,
   Save, ChevronLeft, ChevronRight, Pencil, X, Download,
-  GitMerge, FileBarChart2, Upload, FileSpreadsheet, Trash2, Receipt, Calculator,
+  GitMerge, Upload, FileSpreadsheet, Trash2, Receipt, Calculator,
 } from "lucide-react";
 
 const MAJOR_HEADS = ["Adjustments", "Billing", "Payment"];
@@ -361,8 +361,8 @@ export default function Fin14Page() {
     phase: string; done: number; total: number; pct: number; message?: string;
   } | null>(null);
 
-  // Final Report
-  const [reporting, setReporting] = useState(false);
+  // Per-column rawData filters
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -373,6 +373,9 @@ export default function Fin14Page() {
       if (filterMajor)                   p.set("majorHead",  filterMajor);
       if (filterSub)                     p.set("subHead",    filterSub);
       if (itemSearch)                    p.set("itemSearch", itemSearch);
+      for (const [col, val] of Object.entries(colFilters)) {
+        if (val.trim()) p.set(`rf_${col}`, val.trim());
+      }
       p.set("page",     String(page));
       p.set("pageSize", String(pageSize));
       const res  = await fetch(`/api/fin14?${p}`);
@@ -380,7 +383,7 @@ export default function Fin14Page() {
       setData(json);
       setSelected(new Set());
     } finally { setLoading(false); }
-  }, [filterMatched, filterMajor, filterSub, itemSearch, page]);
+  }, [filterMatched, filterMajor, filterSub, itemSearch, colFilters, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -562,20 +565,6 @@ export default function Fin14Page() {
     }
   };
 
-  const generateFinalReport = async () => {
-    setReporting(true);
-    try {
-      const res = await fetch("/api/fin14/final-report");
-      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? "Report failed"); }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a"); a.href = url;
-      a.download = `FIN14_Final_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click(); URL.revokeObjectURL(url);
-    } catch (e: any) { alert(`Report failed: ${e.message}`); }
-    finally { setReporting(false); }
-  };
-
   const rawCols: string[] = data?.rows.length
     ? Array.from(new Set(data.rows.flatMap((r) => Object.keys(r.rawData))))
     : [];
@@ -640,7 +629,7 @@ export default function Fin14Page() {
             {(filterMajor ? SUB_HEADS[filterMajor] ?? [] : [...new Set(Object.values(SUB_HEADS).flat())]).map((s) => <option key={s}>{s}</option>)}
           </select>
 
-          <button onClick={() => { setFilterMatched("all"); setFilterMajor(""); setFilterSub(""); setItemSearch(""); setPage(1); }}
+          <button onClick={() => { setFilterMatched("all"); setFilterMajor(""); setFilterSub(""); setItemSearch(""); setColFilters({}); setPage(1); }}
             className="text-xs text-gray-400 hover:text-gray-600">
             Clear filters
           </button>
@@ -675,16 +664,6 @@ export default function Fin14Page() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40 transition-colors"
             >
               <Calculator className="w-3.5 h-3.5" />Calculate Monthly
-            </button>
-
-            <button
-              onClick={generateFinalReport}
-              disabled={reporting || !data?.total}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-40 transition-colors"
-            >
-              {reporting
-                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Generating…</>
-                : <><FileBarChart2 className="w-3.5 h-3.5" />Final Report</>}
             </button>
 
             <button
@@ -888,6 +867,7 @@ export default function Fin14Page() {
               <div className="overflow-x-auto">
                 <table className="text-xs whitespace-nowrap border-collapse" style={{ tableLayout: "auto", width: "max-content", minWidth: "100%" }}>
                   <thead className="bg-gray-50 border-b border-gray-100">
+                    {/* Column labels */}
                     <tr>
                       <th style={{ position: "sticky", left: 0, width: 36, minWidth: 36, background: "#f3f4f6", zIndex: 20 }} className="px-2 py-2.5 text-left">
                         <input type="checkbox" checked={!!data && selected.size === data.rows.length && data.rows.length > 0} onChange={selectAll} className="rounded" />
@@ -903,6 +883,37 @@ export default function Fin14Page() {
                       <th className="px-3 py-2.5 text-left font-semibold text-blue-500 uppercase tracking-wide bg-blue-50">Entry By</th>
                       <th className="px-3 py-2.5 text-left font-semibold text-blue-500 uppercase tracking-wide bg-blue-50">Matched By</th>
                       <th className="px-3 py-2.5 text-left font-semibold text-blue-500 uppercase tracking-wide bg-blue-50">Action</th>
+                    </tr>
+                    {/* Column filter inputs */}
+                    <tr className="bg-white border-b border-gray-200">
+                      <th style={{ position: "sticky", left: 0, width: 36, minWidth: 36, background: "#ffffff", zIndex: 20 }} className="px-2 py-1" />
+                      <th style={{ position: "sticky", left: 36, minWidth: 110, background: "#ffffff", zIndex: 20, boxShadow: "2px 0 6px -2px rgba(0,0,0,0.12)" }} className="px-2 py-1" />
+                      {rawCols.map((c) => (
+                        <th key={c} className="px-2 py-1">
+                          <input
+                            type="text"
+                            value={colFilters[c] ?? ""}
+                            onChange={(e) => {
+                              setColFilters((prev) => {
+                                const next = { ...prev };
+                                if (e.target.value) next[c] = e.target.value;
+                                else delete next[c];
+                                return next;
+                              });
+                              setPage(1);
+                            }}
+                            placeholder="Filter…"
+                            className="w-full min-w-[80px] border border-gray-200 rounded px-2 py-0.5 text-[11px] text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-300 font-normal"
+                          />
+                        </th>
+                      ))}
+                      <th colSpan={5} className="px-2 py-1 bg-blue-50">
+                        {Object.keys(colFilters).length > 0 && (
+                          <button onClick={() => { setColFilters({}); setPage(1); }} className="text-[11px] text-blue-400 hover:text-blue-600 font-normal whitespace-nowrap">
+                            Clear column filters
+                          </button>
+                        )}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
