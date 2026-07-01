@@ -60,7 +60,15 @@ export async function POST(_req: NextRequest) {
           rateMap.set(key, { itemName: r.itemName ?? "", itemValue: r.itemValue ?? "" });
         }
 
-        controller.enqueue(sse({ phase: "init", message: `Loaded ${rateMap.size} Rate Sheet entries — collecting FIN14 children…` }));
+        // 2b. Load classroom mappings (FC28 classroom → Rate Sheet item name)
+        const classroomRows: { fc28Classroom: string; rateSheetItem: string | null }[] =
+          await (prisma as any).classroomMapping.findMany();
+        const classroomMap = new Map<string, string>();
+        for (const c of classroomRows) {
+          if (c.rateSheetItem) classroomMap.set(c.fc28Classroom, c.rateSheetItem);
+        }
+
+        controller.enqueue(sse({ phase: "init", message: `Loaded ${rateMap.size} Rate Sheet entries (${classroomMap.size} classroom mappings) — collecting FIN14 keys…` }));
 
         // 3. Collect distinct Rate Card Keys from FIN14
         const keyRows: { rateKey: string }[] = await prisma.$queryRawUnsafe(
@@ -87,7 +95,20 @@ export async function POST(_req: NextRequest) {
           let pi = 1;
 
           for (const rateCardKey of chunk) {
-            const match = rateMap.get(rateCardKey);
+            // Try direct match first; if not found, try with classroom substitution
+            let match = rateMap.get(rateCardKey);
+            if (!match && classroomMap.size > 0) {
+              // FC28 key format: Center|RateSheet|DropOff|Pickup|Program|Classroom
+              const parts = rateCardKey.split("|");
+              if (parts.length === 6) {
+                const fc28Classroom = parts[5];
+                const mappedClassroom = classroomMap.get(fc28Classroom);
+                if (mappedClassroom) {
+                  const mappedKey = [...parts.slice(0, 5), mappedClassroom].join("|");
+                  match = rateMap.get(mappedKey);
+                }
+              }
+            }
             if (!match) { unmapped++; continue; }
 
             const patch = {

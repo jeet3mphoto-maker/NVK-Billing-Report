@@ -852,6 +852,18 @@ model RateSheetRow {
   @@index([rateCardKey])
 }
 
+// ─── Classroom Mapping (FC28 classroom → Rate Sheet item name) ───────────────
+
+model ClassroomMapping {
+  id            String   @id @default(cuid())
+  fc28Classroom String   @unique
+  rateSheetItem String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([fc28Classroom])
+}
+
 // ─── FC28 History Records (legacy — kept for old data) ───────────────────────
 
 model FC28Record {

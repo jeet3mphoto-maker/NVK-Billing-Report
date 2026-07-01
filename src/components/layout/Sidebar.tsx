@@ -5,16 +5,16 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Users, FileText, BookOpen, Database, Receipt, ChevronDown, ChevronRight,
+  Users, FileText, BookOpen, Database, Receipt, ArrowLeftRight,
 } from "lucide-react";
-import { useState } from "react";
 
 const nav = [
-  { href: "/fin14",                  icon: FileText, label: "FIN14 Transactions" },
-  { href: "/fc28",                   icon: Database, label: "FC28 Enrollment" },
-  { href: "/rate-sheet",            icon: Receipt,  label: "Rate Sheet" },
-  { href: "/admin/item-master",     icon: BookOpen, label: "Item Master" },
-  { href: "/admin/asa-employees",   icon: Users,    label: "ASA Employees" },
+  { href: "/fin14",                        icon: FileText,       label: "FIN14 Transactions" },
+  { href: "/fc28",                         icon: Database,       label: "FC28 Enrollment" },
+  { href: "/rate-sheet",                   icon: Receipt,        label: "Rate Sheet" },
+  { href: "/admin/classroom-mapping",      icon: ArrowLeftRight, label: "Classroom Mapping" },
+  { href: "/admin/item-master",            icon: BookOpen,       label: "Item Master" },
+  { href: "/admin/asa-employees",          icon: Users,          label: "ASA Employees" },
 ];
 
 export default function Sidebar() {
