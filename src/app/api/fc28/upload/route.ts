@@ -48,6 +48,14 @@ export async function POST(req: NextRequest) {
     if (!reportDate) return NextResponse.json({ error: "reportDate required" }, { status: 400 });
     if (!isFinal && !files?.length) return NextResponse.json({ error: "No files provided" }, { status: 400 });
 
+    // Load classroom mappings once per request (FC28 classroom → Rate Sheet item name)
+    const classroomMappingRows: { fc28Classroom: string; rateSheetItem: string | null }[] =
+      await db.classroomMapping.findMany();
+    const classroomMap = new Map<string, string>();
+    for (const c of classroomMappingRows) {
+      if (c.rateSheetItem) classroomMap.set(c.fc28Classroom, c.rateSheetItem);
+    }
+
     // Build rows for all files in this chunk
     const dbRows: any[] = [];
     let chunkFileCount = 0;
@@ -91,7 +99,19 @@ export async function POST(req: NextRequest) {
         const pickup    = strVal(row["Pickup"]);
         const program   = strVal(row["Program"]);
         const classroom = strVal(row["Classroom"]);
-        const rateCardKey = [center ?? "", rateSheet ?? "", to24h(dropOff), to24h(pickup), program ?? "", classroom ?? ""].join("|");
+
+        // Use centerShort (before first comma) to match Rate Sheet key format
+        const centerShort       = (center ?? "").split(",")[0].trim();
+        // Revised classroom from mapping; null means not yet mapped
+        const revisedClassroom  = classroom ? (classroomMap.get(classroom) ?? null) : null;
+        const effectiveClassroom = revisedClassroom ?? classroom ?? "";
+
+        const dropOff24 = to24h(dropOff);
+        const pickup24  = to24h(pickup);
+
+        const rateCardKey        = [centerShort, rateSheet ?? "", dropOff24, pickup24, program ?? "", effectiveClassroom].join("|");
+        const earlyAMRateCardKey = [centerShort, rateSheet ?? "", dropOff24, pickup24, "Early AM Care", effectiveClassroom].join("|");
+        const latePMRateCardKey  = [centerShort, rateSheet ?? "", dropOff24, pickup24, "Late PM Care",  effectiveClassroom].join("|");
 
         dbRows.push({
           batchId:         batchId ?? "__pending__",
@@ -146,6 +166,9 @@ export async function POST(req: NextRequest) {
           copayAmt2:       coa2   ? strVal(row[coa2])   : null,
           copayPeriod2:    cop2   ? strVal(row[cop2])   : null,
           rateCardKey,
+          revisedClassroom,
+          earlyAMRateCardKey,
+          latePMRateCardKey,
         });
       }
     }

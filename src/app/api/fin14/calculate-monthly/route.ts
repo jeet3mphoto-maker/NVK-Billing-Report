@@ -164,15 +164,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // 2. Load classroom mappings
-        const classroomRows: { fc28Classroom: string; rateSheetItem: string | null }[] =
-          await db.classroomMapping.findMany();
-        const classroomMap = new Map<string, string>();
-        for (const c of classroomRows) {
-          if (c.rateSheetItem) classroomMap.set(c.fc28Classroom, c.rateSheetItem);
-        }
-
-        controller.enqueue(sse({ phase: "init", message: `Loaded ${rateMap.size} rate entries, ${classroomMap.size} classroom mappings — processing FIN14 rows…` }));
+        controller.enqueue(sse({ phase: "init", message: `Loaded ${rateMap.size} rate entries — processing FIN14 rows…` }));
 
         // 3. Process all FIN14 rows in batches
         const BATCH = 500;
@@ -197,34 +189,23 @@ export async function POST(req: NextRequest) {
             const withdrawalStr = rd["Withdrawal Date (FC28)"] ?? rd["Withdrawal Date"] ?? "";
             const earlyAM       = String(rd["Early AM Care (FC28)"] ?? rd["Early AM Care"] ?? "").trim();
             const latePM        = String(rd["Late PM Care (FC28)"]  ?? rd["Late PM Care"]  ?? "").trim();
-            const rateCardKey   = String(rd["Rate Card Key (FC28)"] ?? "").trim();
+
+            // Use pre-built keys from FC28 mapping (computed at upload time)
+            const earlyAMKey = String(rd["Early AM Rate Card Key (FC28)"] ?? "").trim();
+            const latePMKey  = String(rd["Late PM Rate Card Key (FC28)"]  ?? "").trim();
 
             const fsd = finalStartDate(startStr, withdrawalStr, monthStart, monthEnd);
             const fed = finalEndDate(fsd, withdrawalStr, monthStart, monthEnd);
 
-            // Early AM fee lookup
-            let earlyAMFees = "";
-            if ((earlyAM === "Yes" || earlyAM === "yes") && rateCardKey) {
-              const parts = rateCardKey.split("|");
-              if (parts.length === 6) {
-                const fc28Classroom   = parts[5];
-                const mappedClassroom = classroomMap.get(fc28Classroom) ?? fc28Classroom;
-                const lookupKey = [...parts.slice(0, 4), "Early AM Care", mappedClassroom].join("|");
-                earlyAMFees = rateMap.get(lookupKey) ?? "";
-              }
-            }
+            // Early AM fee — use pre-built key directly
+            const earlyAMFees = (earlyAM === "Yes" || earlyAM === "yes") && earlyAMKey
+              ? (rateMap.get(earlyAMKey) ?? "")
+              : "";
 
-            // Late PM fee lookup
-            let latePMFees = "";
-            if ((latePM === "Yes" || latePM === "yes") && rateCardKey) {
-              const parts = rateCardKey.split("|");
-              if (parts.length === 6) {
-                const fc28Classroom   = parts[5];
-                const mappedClassroom = classroomMap.get(fc28Classroom) ?? fc28Classroom;
-                const lookupKey = [...parts.slice(0, 4), "Late PM Care", mappedClassroom].join("|");
-                latePMFees = rateMap.get(lookupKey) ?? "";
-              }
-            }
+            // Late PM fee — use pre-built key directly
+            const latePMFees = (latePM === "Yes" || latePM === "yes") && latePMKey
+              ? (rateMap.get(latePMKey) ?? "")
+              : "";
 
             const patch: Record<string, any> = {
               "Month Start Date":       monthStartDate,

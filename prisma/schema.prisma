@@ -808,8 +808,11 @@ model FC28Row {
   contractPeriod2  String?
   copayAmt2        String?
   copayPeriod2     String?
-  rateCardKey      String?   // Center|RateSheet|DropOff|Pickup|Program|Classroom
-  createdAt        DateTime  @default(now())
+  rateCardKey         String?   // CenterShort|RateSheet|DropOff(24h)|Pickup(24h)|Program|RevisedClassroom
+  revisedClassroom    String?   // Classroom mapped via ClassroomMapping (null = not yet mapped)
+  earlyAMRateCardKey  String?   // Same as rateCardKey with Program = "Early AM Care"
+  latePMRateCardKey   String?   // Same as rateCardKey with Program = "Late PM Care"
+  createdAt           DateTime  @default(now())
 
   @@index([batchId])
   @@index([childId])

@@ -102,6 +102,8 @@ export default function FC28Page() {
   const [colsOpen,     setColsOpen]     = useState(false);
   const [downloading,  setDownloading]  = useState(false);
   const [deletingId,   setDeletingId]   = useState<string | null>(null);
+  const [recomputing,  setRecomputing]  = useState(false);
+  const [recomputeMsg, setRecomputeMsg] = useState("");
 
   const loadBatches = useCallback(async () => {
     setLoadingBatch(true);
@@ -194,6 +196,18 @@ export default function FC28Page() {
     setSelectedCols(prev => { const n=new Set(prev); keys.forEach(k=>allOn?n.delete(k):n.add(k)); return n; });
   };
 
+  const recomputeKeys = async () => {
+    setRecomputing(true); setRecomputeMsg("");
+    try {
+      const res = await fetch("/api/fc28/recompute-keys", { method: "POST" });
+      const j   = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Recompute failed");
+      setRecomputeMsg(`✓ ${j.mapped} mapped, ${j.unmapped} still unmapped`);
+    } catch (e: any) {
+      setRecomputeMsg(`Error: ${e.message}`);
+    } finally { setRecomputing(false); }
+  };
+
   const deleteBatch = async (id: string) => {
     if (!confirm("Delete this batch and all its rows? This cannot be undone.")) return;
     setDeletingId(id);
@@ -273,9 +287,24 @@ export default function FC28Page() {
 
         {/* History */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-500"/>Upload History</h2>
-            <button onClick={loadBatches} className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1"><RefreshCw className={`w-3 h-3 ${loadingBatch?"animate-spin":""}`}/>Refresh</button>
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              {recomputeMsg && (
+                <span className={`text-xs px-2 py-1 rounded-lg ${recomputeMsg.startsWith("Error") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>
+                  {recomputeMsg}
+                </span>
+              )}
+              <button
+                onClick={recomputeKeys}
+                disabled={recomputing || !batches.length}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 disabled:opacity-40"
+              >
+                <RefreshCw className={`w-3 h-3 ${recomputing ? "animate-spin" : ""}`} />
+                {recomputing ? "Recomputing…" : "Recompute Rate Card Keys"}
+              </button>
+              <button onClick={loadBatches} className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1"><RefreshCw className={`w-3 h-3 ${loadingBatch?"animate-spin":""}`}/>Refresh</button>
+            </div>
           </div>
           {batches.length===0?<div className="p-8 text-center text-slate-400 text-sm">No uploads yet</div>:(
             <table className="w-full text-sm">
