@@ -1,13 +1,113 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Header from "@/components/layout/Header";
-import { RefreshCw, Save, Trash2, ArrowLeftRight } from "lucide-react";
+import { RefreshCw, Save, Trash2, ArrowLeftRight, Plus, X, ChevronDown } from "lucide-react";
+
+const DEFAULT_ITEMS = [
+  "Infant", "Prepper", "Preschooler", "Registration",
+  "School-Age Experience", "Toddler", "Twaddler", "Note", "UPK", "VPK",
+];
 
 interface Mapping {
   id: string;
   fc28Classroom: string;
   rateSheetItem: string | null;
+}
+
+function ItemDropdown({
+  value,
+  options,
+  onChange,
+  onAddOption,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  onAddOption: (v: string) => void;
+}) {
+  const [open,    setOpen]    = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const addNew = () => {
+    const v = newItem.trim();
+    if (!v) return;
+    onAddOption(v);
+    onChange(v);
+    setNewItem("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between border rounded-lg px-3 py-1.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-violet-300 ${value ? "border-slate-200 text-slate-800" : "border-slate-200 text-slate-400"}`}
+      >
+        <span>{value || "Select item name…"}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+          {/* Clear option */}
+          {value && (
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Clear selection
+            </button>
+          )}
+
+          {/* Existing options */}
+          <div className="max-h-52 overflow-y-auto">
+            {options.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { onChange(opt); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-violet-50 hover:text-violet-700 ${value === opt ? "bg-violet-50 text-violet-700 font-medium" : "text-slate-700"}`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+
+          {/* Add new option */}
+          <div className="border-t border-slate-100 p-2 flex gap-1">
+            <input
+              type="text"
+              value={newItem}
+              onChange={e => setNewItem(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addNew(); } }}
+              placeholder="Add new item…"
+              className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+            />
+            <button
+              type="button"
+              onClick={addNew}
+              disabled={!newItem.trim()}
+              className="flex items-center gap-1 px-2 py-1 bg-violet-600 text-white text-xs rounded-lg hover:bg-violet-700 disabled:opacity-40"
+            >
+              <Plus className="w-3 h-3" /> Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ClassroomMappingPage() {
@@ -17,17 +117,24 @@ export default function ClassroomMappingPage() {
   const [edits,     setEdits]     = useState<Record<string, string>>({});
   const [saving,    setSaving]    = useState<Record<string, boolean>>({});
   const [syncMsg,   setSyncMsg]   = useState("");
+  const [options,   setOptions]   = useState<string[]>(DEFAULT_ITEMS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/classroom-mapping");
-      const j   = await res.json();
+      const res  = await fetch("/api/classroom-mapping");
+      const j    = await res.json();
       const list: Mapping[] = j.mappings ?? [];
       setMappings(list);
       const init: Record<string, string> = {};
       for (const m of list) init[m.id] = m.rateSheetItem ?? "";
       setEdits(init);
+      // Add any saved values not already in the default list
+      setOptions(prev => {
+        const extra = list.map(m => m.rateSheetItem).filter(Boolean) as string[];
+        const merged = Array.from(new Set([...prev, ...extra])).sort();
+        return merged;
+      });
     } finally { setLoading(false); }
   }, []);
 
@@ -65,6 +172,9 @@ export default function ClassroomMappingPage() {
     setMappings(prev => prev.filter(m => m.id !== id));
   };
 
+  const addOption = (v: string) =>
+    setOptions(prev => Array.from(new Set([...prev, v])).sort());
+
   const unmapped = mappings.filter(m => !m.rateSheetItem).length;
   const mapped   = mappings.length - unmapped;
 
@@ -82,7 +192,7 @@ export default function ClassroomMappingPage() {
                 FC28 Classroom → Rate Sheet Item
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Map each FC28 classroom name to its corresponding Rate Sheet item name so the Rate Card Key matches during mapping.
+                Map each FC28 classroom name to its Rate Sheet item name. Use the dropdown or add a new option.
               </p>
             </div>
             <button
@@ -122,9 +232,9 @@ export default function ClassroomMappingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-1/2">FC28 Classroom</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-1/2">Rate Sheet Item Name</th>
-                  <th className="px-4 py-3 w-24"></th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-5/12">FC28 Classroom</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-5/12">Rate Sheet Item Name</th>
+                  <th className="px-4 py-3 w-2/12"></th>
                 </tr>
               </thead>
               <tbody>
@@ -138,12 +248,11 @@ export default function ClassroomMappingPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
-                        <input
-                          type="text"
+                        <ItemDropdown
                           value={edits[m.id] ?? ""}
-                          onChange={e => setEdits(prev => ({ ...prev, [m.id]: e.target.value }))}
-                          placeholder="Enter Rate Sheet item name…"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          options={options}
+                          onChange={v => setEdits(prev => ({ ...prev, [m.id]: v }))}
+                          onAddOption={addOption}
                         />
                       </td>
                       <td className="px-4 py-2.5">
@@ -175,7 +284,7 @@ export default function ClassroomMappingPage() {
         </div>
 
         <p className="text-xs text-slate-400 text-center">
-          After updating mappings, re-run "Map Rate Sheet to FIN14" on the FIN14 Transactions page to apply the new mappings.
+          After saving mappings, re-run "Map Rate Sheet to FIN14" on the FIN14 Transactions page to apply them.
         </p>
       </main>
     </div>
