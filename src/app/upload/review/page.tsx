@@ -6,7 +6,7 @@ import Header from "@/components/layout/Header";
 import {
   CheckCircle2, XCircle, RefreshCw, Search, Filter,
   Plus, Save, ChevronLeft, ChevronRight, BookOpen, Pencil, X, Download,
-  GitMerge, FileBarChart2,
+  GitMerge, FileBarChart2, Trash2,
 } from "lucide-react";
 
 const MAJOR_HEADS = ["Adjustments", "Billing", "Payment"];
@@ -161,6 +161,8 @@ function ReviewPageContent() {
   } | null>(null);
   // Final Report
   const [reporting,     setReporting]     = useState(false);
+  // Clear FIN14
+  const [clearing,      setClearing]      = useState(false);
 
   const exportExcel = async () => {
     setDownloading(true);
@@ -255,6 +257,23 @@ function ReviewPageContent() {
       alert(`Report generation failed: ${e.message}`);
     } finally {
       setReporting(false);
+    }
+  };
+
+  const clearFin14 = async () => {
+    if (!confirm("This will permanently delete ALL FIN14 data (all batches and rows). This cannot be undone. Continue?")) return;
+    setClearing(true);
+    try {
+      const res = await fetch("/api/fin14", { method: "DELETE" });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? "Clear failed"); }
+      const j = await res.json();
+      alert(`Cleared ${j.deleted} batch(es). All FIN14 data has been deleted.`);
+      setData(null);
+      setBatchId("");
+    } catch (e: any) {
+      alert(`Clear failed: ${e.message}`);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -414,6 +433,18 @@ function ReviewPageContent() {
               {reporting
                 ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Generating…</>
                 : <><FileBarChart2 className="w-3.5 h-3.5" />Generate Final Report</>}
+            </button>
+
+            {/* Clear all FIN14 data */}
+            <button
+              onClick={clearFin14}
+              disabled={clearing}
+              title="Delete all FIN14 batches and rows permanently"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-40 transition-colors"
+            >
+              {clearing
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Clearing…</>
+                : <><Trash2 className="w-3.5 h-3.5" />Clear FIN14 Data</>}
             </button>
           </div>
 

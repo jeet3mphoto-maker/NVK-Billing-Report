@@ -87,3 +87,9 @@ export async function PATCH(req: NextRequest) {
   await db.fin14Row.updateMany({ where: { id: { in: ids.map(Number) } }, data: updateData });
   return NextResponse.json({ updated: ids.length });
 }
+
+// DELETE /api/fin14  — deletes ALL FIN14 data (all batches + rows via cascade)
+export async function DELETE(_req: NextRequest) {
+  const result = await db.fin14Batch.deleteMany({});
+  return NextResponse.json({ deleted: result.count });
+}
