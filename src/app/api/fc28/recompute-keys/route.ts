@@ -44,38 +44,46 @@ export async function POST() {
       latestBatch.id
     );
 
+    // 10 params per combo; PostgreSQL hard limit is 32767 → max 3276 combos per batch
+    const BATCH = 3000;
     let mapped = 0, unmapped = 0;
-    const valueParts: string[] = [];
-    const params: any[] = [];
-    let pi = 1;
 
+    // Pre-compute all combo rows
+    const rows: { parts: any[]; revisedClassroom: string | null }[] = [];
     for (const c of combos) {
       const centerShort        = c.center.split(",")[0].trim();
       const classroom          = c.classroom;
       const revisedClassroom   = classroom ? (classroomMap.get(classroom) ?? null) : null;
       const effectiveClassroom = revisedClassroom ?? classroom;
-      const dropOff24          = to24h(c.dropOff  || null);
-      const pickup24           = to24h(c.pickup    || null);
+      const dropOff24          = to24h(c.dropOff || null);
+      const pickup24           = to24h(c.pickup   || null);
       const rateSheet          = c.rateSheet;
       const program            = c.program;
 
-      const rateCardKey        = [centerShort, rateSheet, dropOff24, pickup24, program,         effectiveClassroom].join("|");
+      const rateCardKey        = [centerShort, rateSheet, dropOff24, pickup24, program, effectiveClassroom].join("|");
       const earlyAMRateCardKey = [centerShort, rateSheet, "Early AM Care", effectiveClassroom].join("|");
       const latePMRateCardKey  = [centerShort, rateSheet, "Late PM Care",  effectiveClassroom].join("|");
 
       revisedClassroom ? mapped++ : unmapped++;
-
-      valueParts.push(
-        `($${pi},$${pi+1},$${pi+2},$${pi+3},$${pi+4},$${pi+5},$${pi+6},$${pi+7}::text,$${pi+8},$${pi+9})`
-      );
-      params.push(
-        c.center, c.rateSheet, c.dropOff, c.pickup, c.program, c.classroom,
-        rateCardKey, revisedClassroom, earlyAMRateCardKey, latePMRateCardKey
-      );
-      pi += 10;
+      rows.push({
+        parts: [c.center, c.rateSheet, c.dropOff, c.pickup, c.program, c.classroom, rateCardKey, revisedClassroom, earlyAMRateCardKey, latePMRateCardKey],
+        revisedClassroom,
+      });
     }
 
-    if (valueParts.length > 0) {
+    // Run in batches to stay under the 32767 bind-variable limit
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const chunk = rows.slice(i, i + BATCH);
+      const valueParts: string[] = [];
+      const params: any[] = [];
+      let pi = 1;
+
+      for (const row of chunk) {
+        valueParts.push(`($${pi},$${pi+1},$${pi+2},$${pi+3},$${pi+4},$${pi+5},$${pi+6},$${pi+7}::text,$${pi+8},$${pi+9})`);
+        params.push(...row.parts);
+        pi += 10;
+      }
+
       params.push(latestBatch.id);
       await prisma.$executeRawUnsafe(
         `UPDATE "FC28Row" AS t
