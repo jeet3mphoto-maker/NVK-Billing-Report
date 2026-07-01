@@ -22,20 +22,24 @@ export async function GET(req: NextRequest) {
 
     if (!rows.length) return NextResponse.json({ error: "No rows found" }, { status: 404 });
 
-    const headers = ["Rate Card Key", "Center", "Entity", "Version Name", "Created", "Modified",
-                     "Active", "Drop Off", "Pick Up", "Program", "Item Name", "Item Value", "Source File"];
+    const headers = [
+      "Rate Card Key", "Early AM Rate Card Key", "Late PM Rate Card Key",
+      "Center", "Entity", "Version Name", "Created", "Modified",
+      "Active", "Drop Off", "Pick Up", "Program", "Item Name", "Item Value", "Source File",
+    ];
 
     const data: any[][] = [headers];
     for (const r of rows) {
       data.push([
-        r.rateCardKey ?? "", r.center ?? "", r.entity ?? "", r.versionName ?? "",
+        r.rateCardKey ?? "", r.earlyAMRateCardKey ?? "", r.latePMRateCardKey ?? "",
+        r.center ?? "", r.entity ?? "", r.versionName ?? "",
         r.created ?? "", r.modified ?? "", r.active ?? "", r.dropOff ?? "",
         r.pickUp ?? "", r.program ?? "", r.itemName ?? "", r.itemValue ?? "", r.sourceFile ?? "",
       ]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws["!cols"] = [40, 22, 16, 20, 14, 14, 8, 14, 14, 22, 28, 18, 28].map(w => ({ wch: w }));
+    ws["!cols"] = [44, 36, 36, 22, 16, 20, 14, 14, 8, 14, 14, 22, 28, 18, 28].map(w => ({ wch: w }));
     ws["!freeze"] = { xSplit: 0, ySplit: 1 };
 
     const wb  = XLSX.utils.book_new();
