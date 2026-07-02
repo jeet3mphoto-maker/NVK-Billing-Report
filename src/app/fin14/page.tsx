@@ -337,6 +337,8 @@ export default function Fin14Page() {
   const [assignRow,  setAssignRow]  = useState<Fin14Row | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [downloading,  setDownloading]  = useState(false);
+  const [reapplying,   setReapplying]   = useState(false);
+  const [reapplyMsg,   setReapplyMsg]   = useState<string | null>(null);
 
   // Map FC28
   const [mapping,     setMapping]     = useState(false);
@@ -448,6 +450,19 @@ export default function Fin14Page() {
       a.click(); URL.revokeObjectURL(url);
     } catch (e: any) { alert(e.message); }
     finally { setDownloading(false); }
+  };
+
+  const reapplyFlags = async () => {
+    if (!confirm("Re-apply Item Master rules to all FIN14 rows?\n\nManually-flagged rows (Entry By = Manual) will be skipped.")) return;
+    setReapplying(true); setReapplyMsg(null);
+    try {
+      const res  = await fetch("/api/fin14/reapply-flags", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      setReapplyMsg(json.message ?? "Done");
+      load();
+    } catch (e: any) { setReapplyMsg("Error: " + e.message); }
+    finally { setReapplying(false); }
   };
 
   const mapFC28 = async () => {
@@ -641,6 +656,16 @@ export default function Fin14Page() {
                 {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
               </>
             )}
+
+            <button
+              onClick={reapplyFlags}
+              disabled={reapplying || !data?.total}
+              title={reapplyMsg ?? "Re-run Item Master rules on all rows (skips Manual)"}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-40 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${reapplying ? "animate-spin" : ""}`} />
+              {reapplying ? "Reapplying…" : reapplyMsg ? "✓ Reapplied" : "Reapply from Master"}
+            </button>
 
             <button
               onClick={mapFC28}
