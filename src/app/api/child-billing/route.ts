@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     ];
   }
 
-  const [total, rows] = await Promise.all([
+  const [total, rows, allKeysRows] = await Promise.all([
     db.childBillingRow.count({ where }),
     db.childBillingRow.findMany({
       where,
@@ -30,9 +30,16 @@ export async function GET(req: NextRequest) {
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    // Collect all distinct rawData keys across the entire batch
+    prisma.$queryRawUnsafe(
+      `SELECT DISTINCT jsonb_object_keys("rawData") AS key FROM "ChildBillingRow" WHERE "batchId" = $1`,
+      batch.id
+    ) as Promise<{ key: string }[]>,
   ]);
 
-  return NextResponse.json({ total, page, pageSize, rows, batchId: batch.id });
+  const allColumns = (allKeysRows as { key: string }[]).map((r) => r.key);
+
+  return NextResponse.json({ total, page, pageSize, rows, batchId: batch.id, allColumns });
 }
 
 // DELETE /api/child-billing — clears all child billing data
