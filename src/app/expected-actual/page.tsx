@@ -3,6 +3,36 @@
 import { useState, useCallback, useRef } from "react";
 import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt } from "lucide-react";
 
+// ── column ordering ────────────────────────────────────────────────────────
+const FC28_ORDER = [
+  "Child Status (FC28)","Family Status (FC28)","Classroom (FC28)","Rate Sheet (FC28)",
+  "Date of Birth (FC28)","Enroll Date (FC28)","Start Date (FC28)","Withdrawal Date (FC28)",
+  "Withdrawal Reason (FC28)","Primary Guardian (FC28)",
+  "Mon (FC28)","Tue (FC28)","Wed (FC28)","Thu (FC28)","Fri (FC28)",
+  "Drop Off (FC28)","Pickup (FC28)","Early AM Care (FC28)","Late PM Care (FC28)","Program (FC28)",
+  "Discount Type (FC28)","Discount Name (FC28)","Main Discount (FC28)","AM/PM Discount (FC28)","Total Discount (FC28)",
+  "Billing Cycle (FC28)",
+  "Agency 1 (FC28)","Family Contrib 1 (FC28)","Contract Amt 1 (FC28)","Contract Period 1 (FC28)","Copay Amt 1 (FC28)","Copay Period 1 (FC28)",
+  "Agency 2 (FC28)","Contract Amt 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
+  "Rate Card Key (FC28)","Revised Classroom (FC28)","Early AM Rate Card Key (FC28)","Late PM Rate Card Key (FC28)",
+];
+const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];
+const CALC_ORDER = [
+  "Month Start Date","Month End Date","Total Days in Month","Total Mondays in Month",
+  "Final Start Date","Final End Date","Final Days to be Billed","Final Weeks to be Billed",
+  "Early AM Care Fees","Late PM Care Fees","Gross Billing Amount","Agency Type",
+  "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
+];
+const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...CALC_ORDER]);
+
+function sortColumns(cols: string[]): string[] {
+  const headCols = cols.filter(c => !KNOWN_SET.has(c)).sort();
+  const fc28     = FC28_ORDER.filter(c => cols.includes(c));
+  const rs       = RATE_SHEET_ORDER.filter(c => cols.includes(c));
+  const calc     = CALC_ORDER.filter(c => cols.includes(c));
+  return [...headCols, ...fc28, ...rs, ...calc];
+}
+
 // ── types ──────────────────────────────────────────────────────────────────
 type Phase = "idle" | "running" | "done" | "error";
 interface SSEProgress { phase: string; message?: string; done?: number; total?: number; pct?: number; mapped?: number; unmapped?: number; }
@@ -79,8 +109,8 @@ export default function ExpectedActualPage() {
   const [search,  setSearch]  = useState("");
   const [loading, setLoading] = useState(false);
 
-  // all rawData keys across the entire batch (returned by API)
-  const rawKeys: string[] = (data as any)?.allColumns ?? [];
+  // all rawData keys across the entire batch — sorted in fixed order
+  const rawKeys: string[] = sortColumns((data as any)?.allColumns ?? []);
   const FIXED     = ["childId","childName","center","centerId","familyId","familyName"];
 
   const load = useCallback(async (p = page, s = search) => {
