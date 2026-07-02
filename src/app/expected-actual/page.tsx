@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt } from "lucide-react";
 
 // ── types ──────────────────────────────────────────────────────────────────
 type Phase = "idle" | "running" | "done" | "error";
@@ -66,6 +66,8 @@ export default function ExpectedActualPage() {
   const aggSSE     = useSSE();
   // map fc28
   const mapSSE     = useSSE();
+  // map rate sheet
+  const mapRSSSE   = useSSE();
   // calculate monthly
   const calcSSE    = useSSE();
   const [monthStart, setMonthStart] = useState("");
@@ -144,7 +146,17 @@ export default function ExpectedActualPage() {
             onRun={() => mapSSE.run("/api/child-billing/map-fc28")}
           />
 
-          {/* 3. Calculate Monthly */}
+          {/* 3. Map Rate Sheet */}
+          <OperationCard
+            title="3. Map Rate Sheet"
+            description="Look up Rate Card Key → Item Name & Item Value from Rate Sheet"
+            icon={<Receipt className="w-4 h-4" />}
+            phase={mapRSSSE.phase}
+            log={mapRSSSE.log}
+            onRun={() => mapRSSSE.run("/api/child-billing/map-rate-sheet")}
+          />
+
+          {/* 4. Calculate Monthly */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 w-72">
             <div className="flex items-center gap-2 mb-1">
               <Calculator className="w-4 h-4 text-blue-600" />
