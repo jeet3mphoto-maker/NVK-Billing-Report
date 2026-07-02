@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt } from "lucide-react";
+import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt, Building2 } from "lucide-react";
 
 // ── column ordering ────────────────────────────────────────────────────────
 const FC28_ORDER = [
@@ -17,20 +17,25 @@ const FC28_ORDER = [
   "Rate Card Key (FC28)","Revised Classroom (FC28)","Early AM Rate Card Key (FC28)","Late PM Rate Card Key (FC28)",
 ];
 const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];
+const AGENCY_ORDER = [
+  "Agency 1 - Revised Agency Name","Agency 1 - Agency Name (Agency)","Agency 1 - Contract Period (Agency)","Agency 1 - Agency Type (Agency)","Agency 1 - Agency Active","Agency 1 - Use Blackout Dates","Agency 1 - Discounts Permitted",
+  "Agency 2 - Revised Agency Name","Agency 2 - Agency Name (Agency)","Agency 2 - Contract Period (Agency)","Agency 2 - Agency Type (Agency)","Agency 2 - Agency Active","Agency 2 - Use Blackout Dates","Agency 2 - Discounts Permitted",
+];
 const CALC_ORDER = [
   "Month Start Date","Month End Date","Total Days in Month","Total Mondays in Month",
   "Final Start Date","Final End Date","Final Days to be Billed","Final Weeks to be Billed",
   "Early AM Care Fees","Late PM Care Fees","Gross Billing Amount","Agency Type",
   "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
 ];
-const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...CALC_ORDER]);
+const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...AGENCY_ORDER, ...CALC_ORDER]);
 
 function sortColumns(cols: string[]): string[] {
   const headCols = cols.filter(c => !KNOWN_SET.has(c)).sort();
   const fc28     = FC28_ORDER.filter(c => cols.includes(c));
   const rs       = RATE_SHEET_ORDER.filter(c => cols.includes(c));
+  const agency   = AGENCY_ORDER.filter(c => cols.includes(c));
   const calc     = CALC_ORDER.filter(c => cols.includes(c));
-  return [...headCols, ...fc28, ...rs, ...calc];
+  return [...headCols, ...fc28, ...rs, ...agency, ...calc];
 }
 
 // ── types ──────────────────────────────────────────────────────────────────
@@ -98,6 +103,8 @@ export default function ExpectedActualPage() {
   const mapSSE     = useSSE();
   // map rate sheet
   const mapRSSSE   = useSSE();
+  // map agencies
+  const mapAgSSE   = useSSE();
   // calculate monthly
   const calcSSE    = useSSE();
   const [monthStart, setMonthStart] = useState("");
@@ -185,11 +192,21 @@ export default function ExpectedActualPage() {
             onRun={() => mapRSSSE.run("/api/child-billing/map-rate-sheet")}
           />
 
-          {/* 4. Calculate Monthly */}
+          {/* 4. Map Agencies */}
+          <OperationCard
+            title="4. Map Agencies"
+            description="Resolve Agency 1 & 2 via Agency Name Mapping + Agency Settings (name + contract period)"
+            icon={<Building2 className="w-4 h-4" />}
+            phase={mapAgSSE.phase}
+            log={mapAgSSE.log}
+            onRun={() => mapAgSSE.run("/api/child-billing/map-agencies")}
+          />
+
+          {/* 5. Calculate Monthly */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 w-72">
             <div className="flex items-center gap-2 mb-1">
               <Calculator className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold text-sm text-gray-700">3. Calculate Monthly</span>
+              <span className="font-semibold text-sm text-gray-700">5. Calculate Monthly</span>
             </div>
             <p className="text-xs text-gray-400 mb-3">Compute billing amounts for the selected month</p>
             <div className="flex gap-2 mb-3">
