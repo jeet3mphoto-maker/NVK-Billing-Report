@@ -61,24 +61,49 @@ export default function RateSheetPage() {
     try {
       const allFiles: { name: string; rows: Record<string, any>[] }[] = [];
 
+      const agencyFiles: { name: string; agencyRows: Record<string, any>[] }[] = [];
+
       for (const file of files) {
         setUploadLog(prev => [...prev, `Parsing ${file.name}…`]);
         const xlsxMod = await import("xlsx");
         const XLSX = (xlsxMod as any).default ?? xlsxMod;
         const buf  = await file.arrayBuffer();
         const wb   = XLSX.read(buf, { type: "array", raw: true });
+
+        // Main sheet (first sheet = rate data)
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: null }) as Record<string, any>[];
-        setUploadLog(prev => [...prev, `  ${rows.length.toLocaleString()} rows read`]);
+        setUploadLog(prev => [...prev, `  ${rows.length.toLocaleString()} rate rows read`]);
         allFiles.push({ name: file.name, rows });
+
+        // "Agencies" sheet (case-insensitive search)
+        const agencySheetName = wb.SheetNames.find(
+          (n: string) => n.trim().toLowerCase() === "agencies"
+        );
+        if (agencySheetName) {
+          const aws       = wb.Sheets[agencySheetName];
+          const agencyRows = XLSX.utils.sheet_to_json(aws, { defval: null }) as Record<string, any>[];
+          setUploadLog(prev => [...prev, `  ${agencyRows.length.toLocaleString()} agency rows read`]);
+          agencyFiles.push({ name: file.name, agencyRows });
+        }
       }
 
-      setUploadLog(prev => [...prev, `Uploading & processing…`]);
+      setUploadLog(prev => [...prev, `Uploading rate sheet data…`]);
       const res = await fetch("/api/rate-sheet/upload", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ files: allFiles }),
       });
+
+      // Upload Agencies data if any was found
+      if (agencyFiles.length > 0) {
+        setUploadLog(prev => [...prev, `Uploading agency settings…`]);
+        await fetch("/api/agency-settings/upload", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ files: agencyFiles }),
+        });
+      }
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));

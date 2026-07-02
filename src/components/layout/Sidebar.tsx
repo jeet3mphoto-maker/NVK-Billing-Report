@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Users, FileText, BookOpen, Database, Receipt, ArrowLeftRight, BarChart3,
+  Users, FileText, BookOpen, Database, Receipt, ArrowLeftRight, BarChart3, Building2,
 } from "lucide-react";
 
 const nav = [
@@ -14,6 +14,7 @@ const nav = [
   { href: "/rate-sheet",                   icon: Receipt,        label: "Rate Sheet" },
   { href: "/expected-actual",              icon: BarChart3,      label: "Expected vs Actual" },
   { href: "/admin/classroom-mapping",      icon: ArrowLeftRight, label: "Classroom Mapping" },
+  { href: "/admin/agency-mapping",         icon: Building2,      label: "Agency Mapping" },
   { href: "/admin/item-master",            icon: BookOpen,       label: "Item Master" },
   { href: "/admin/asa-employees",          icon: Users,          label: "ASA Employees" },
 ];

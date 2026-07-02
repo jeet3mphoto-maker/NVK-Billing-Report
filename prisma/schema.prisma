@@ -885,6 +885,45 @@ model ChildBillingRow {
   @@index([childId])
 }
 
+// ─── Agency Settings (from "Agencies" sheet in Rate Sheet Excel) ─────────────
+
+model AgencySettingBatch {
+  id         String          @id @default(cuid())
+  uploadedAt DateTime        @default(now())
+  fileCount  Int             @default(0)
+  rowCount   Int             @default(0)
+  rows       AgencySetting[]
+}
+
+model AgencySetting {
+  id                 String             @id @default(cuid())
+  batchId            String
+  batch              AgencySettingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  center             String?
+  active             String?
+  contractPeriod     String?
+  name               String?
+  type               String?
+  useBlackoutDates   String?
+  discountsPermitted String?
+  createdAt          DateTime           @default(now())
+
+  @@index([batchId])
+  @@index([name])
+}
+
+// ─── Agency Name Mapping (FC28 agency1/agency2 → AgencySetting name) ─────────
+
+model AgencyNameMapping {
+  id                String   @id @default(cuid())
+  fc28AgencyName    String   @unique
+  agencySettingName String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([fc28AgencyName])
+}
+
 // ─── Classroom Mapping (FC28 classroom → Rate Sheet item name) ───────────────
 
 model ClassroomMapping {
