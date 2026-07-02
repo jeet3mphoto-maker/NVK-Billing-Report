@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Header from "@/components/layout/Header";
-import { RefreshCw, Save, Trash2, Building2, ChevronDown, X } from "lucide-react";
+import { RefreshCw, Save, Trash2, Building2, ChevronDown, X, Search, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface Mapping {
   id: string;
@@ -25,7 +24,10 @@ function AgencyDropdown({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -40,47 +42,56 @@ function AgencyDropdown({
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setSearch(""); }}
-        className={`w-full flex items-center justify-between border rounded-lg px-3 py-1.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-300 ${value ? "border-slate-200 text-slate-800" : "border-slate-200 text-slate-400"}`}
+        className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-sm text-left transition-colors ${
+          open ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+        } ${value ? "text-slate-800 bg-white" : "text-slate-400 bg-white"}`}
       >
-        <span className="truncate">{value || "Select agency name…"}</span>
-        <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 ml-1 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="truncate pr-2">{value || "Select agency…"}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-          {/* Search */}
-          <div className="p-2 border-b border-slate-100">
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
+            <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
             <input
               autoFocus
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search agency…"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Search agencies…"
+              className="flex-1 bg-transparent text-xs focus:outline-none text-slate-700 placeholder-slate-400"
             />
           </div>
 
-          {/* Clear */}
           {value && (
             <button
               type="button"
               onClick={() => { onChange(""); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-1"
+              className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-slate-100 flex items-center gap-1.5"
             >
               <X className="w-3 h-3" /> Clear selection
             </button>
           )}
 
-          <div className="max-h-56 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="px-3 py-4 text-xs text-slate-400 text-center">No agencies found in Agency Settings</p>
+          <div className="max-h-52 overflow-y-auto">
+            {options.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <AlertCircle className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
+                <p className="text-xs text-slate-500">No agencies in Agency Settings</p>
+                <p className="text-xs text-slate-400 mt-0.5">Re-upload Rate Sheet files with an Agencies sheet</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <p className="px-3 py-4 text-xs text-slate-400 text-center">No match for "{search}"</p>
             ) : (
               filtered.map(opt => (
                 <button
                   key={opt}
                   type="button"
-                  onClick={() => { onChange(opt); setOpen(false); }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 ${value === opt ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"}`}
+                  onClick={() => { onChange(opt); setOpen(false); setSearch(""); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${
+                    value === opt ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
+                  }`}
                 >
                   {opt}
                 </button>
@@ -101,11 +112,13 @@ export default function AgencyMappingPage() {
   const [saving,   setSaving]   = useState<Record<string, boolean>>({});
   const [syncMsg,  setSyncMsg]  = useState("");
   const [options,  setOptions]  = useState<string[]>([]);
+  const [agencyBatch, setAgencyBatch] = useState<any>(null);
 
   const loadOptions = useCallback(async () => {
     const res = await fetch("/api/agency-settings");
     const j   = await res.json();
     setOptions(j.names ?? []);
+    setAgencyBatch(j.batch ?? null);
   }, []);
 
   const load = useCallback(async () => {
@@ -121,10 +134,7 @@ export default function AgencyMappingPage() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    loadOptions();
-    load();
-  }, []);
+  useEffect(() => { loadOptions(); load(); }, []);
 
   const sync = async () => {
     setSyncing(true);
@@ -133,7 +143,7 @@ export default function AgencyMappingPage() {
       const res = await fetch("/api/agency-name-mapping/sync", { method: "POST" });
       const j   = await res.json();
       if (!res.ok) throw new Error(j.error ?? "Sync failed");
-      setSyncMsg(`Synced — ${j.added} new agency name(s) added, ${j.skipped} already existed`);
+      setSyncMsg(`✓ ${j.added} new agency name(s) added, ${j.skipped} already existed`);
       await load();
     } catch (e: any) {
       setSyncMsg(`Error: ${e.message}`);
@@ -158,131 +168,163 @@ export default function AgencyMappingPage() {
     if (!confirm("Remove this agency name mapping?")) return;
     await fetch(`/api/agency-name-mapping/${id}`, { method: "DELETE" });
     setMappings(prev => prev.filter(m => m.id !== id));
+    setEdits(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   const unmapped = mappings.filter(m => !m.agencySettingName).length;
   const mapped   = mappings.length - unmapped;
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
-      <Header title="Agency Name Mapping" />
-      <main className="flex-1 p-6 max-w-4xl mx-auto w-full space-y-6">
+    <div className="p-6 space-y-5 max-w-5xl mx-auto">
 
-        {/* Header card */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-500" />
-                FC28 Agency Name → Agency Settings Name
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Map each agency name from FC28 (Agency 1 / Agency 2 columns) to the
-                canonical name from the Agencies sheet in your Rate Sheet files.
-              </p>
-            </div>
-            <button
-              onClick={sync}
-              disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Syncing…" : "Sync from FC28"}
-            </button>
-          </div>
-
-          {syncMsg && (
-            <p className={`mt-3 text-sm px-3 py-2 rounded-lg ${syncMsg.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-              {syncMsg}
-            </p>
-          )}
-
-          {options.length === 0 && (
-            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-              No agency names loaded from Agency Settings yet. Upload Rate Sheet files that include an <strong>Agencies</strong> sheet to populate the dropdown.
-            </div>
-          )}
-
-          {mappings.length > 0 && (
-            <div className="mt-4 flex gap-4 text-sm">
-              <span className="text-green-700 font-medium">{mapped} mapped</span>
-              <span className="text-amber-600 font-medium">{unmapped} unmapped</span>
-              <span className="text-slate-500">{mappings.length} total</span>
-            </div>
-          )}
+      {/* Page title */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+          <Building2 className="w-5 h-5 text-blue-700" />
         </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Agency Name Mapping</h1>
+          <p className="text-sm text-slate-500">Map FC28 agency names to canonical names from the Agencies sheet</p>
+        </div>
+      </div>
 
-        {/* Mapping table */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
-          {loading ? (
-            <div className="p-12 text-center text-slate-400 text-sm">Loading…</div>
-          ) : mappings.length === 0 ? (
-            <div className="p-12 text-center">
-              <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500 font-medium">No agency mappings yet</p>
-              <p className="text-slate-400 text-sm mt-1">
-                Click "Sync from FC28" to pull agency names from the latest FC28 upload.
-              </p>
+      {/* Agency Settings status */}
+      {agencyBatch ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-green-800">
+          <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+          <span>
+            Agency Settings loaded — <strong>{agencyBatch.rowCount} rows</strong> from{" "}
+            <strong>{agencyBatch.fileCount} file(s)</strong>, uploaded{" "}
+            {new Date(agencyBatch.uploadedAt).toLocaleString("en-IN")}.{" "}
+            <strong>{options.length} unique agency names</strong> available in dropdown.
+          </span>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3 text-sm text-amber-800">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <span>
+            No Agency Settings data yet. Go to <strong>Rate Sheet</strong> and re-upload your
+            center Excel files — each file must contain an <strong>"Agencies"</strong> sheet
+            with columns: Center, Active, Contract Period, Name, Type, Use Blackout Dates, Discounts Permitted.
+          </span>
+        </div>
+      )}
+
+      {/* Stats + Sync bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          {mappings.length > 0 ? (
+            <div className="flex items-center gap-5 text-sm">
+              <span className="flex items-center gap-1.5 text-green-700 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                {mapped} mapped
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-600 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                {unmapped} unmapped
+              </span>
+              <span className="text-slate-400">{mappings.length} total</span>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-5/12">FC28 Agency Name</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 w-5/12">Agency Settings Name</th>
-                  <th className="px-4 py-3 w-2/12"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {mappings.map((m, i) => {
-                  const dirty = edits[m.id] !== (m.agencySettingName ?? "");
-                  return (
-                    <tr key={m.id} className={`border-b border-slate-50 ${i % 2 === 0 ? "" : "bg-slate-50/50"}`}>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-mono ${m.agencySettingName ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-700"}`}>
-                          {m.fc28AgencyName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <AgencyDropdown
-                          value={edits[m.id] ?? ""}
-                          options={options}
-                          onChange={v => setEdits(prev => ({ ...prev, [m.id]: v }))}
-                        />
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1 justify-end">
-                          {dirty && (
-                            <button
-                              onClick={() => save(m.id)}
-                              disabled={saving[m.id]}
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              <Save className="w-3 h-3" />
-                              {saving[m.id] ? "…" : "Save"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => remove(m.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <p className="text-sm text-slate-500">No agency names synced yet.</p>
           )}
+          <p className="text-xs text-slate-400">
+            Pull unique Agency 1 / Agency 2 values from the latest FC28 upload
+          </p>
         </div>
+        <button
+          onClick={sync}
+          disabled={syncing}
+          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Syncing…" : "Sync from FC28"}
+        </button>
+      </div>
 
-        <p className="text-xs text-slate-400 text-center">
-          Agency names are pulled from the <strong>Agency 1</strong> and <strong>Agency 2</strong> columns of the latest FC28 upload.
-          Upload Rate Sheet files containing an <strong>Agencies</strong> sheet to populate the dropdown.
-        </p>
-      </main>
+      {syncMsg && (
+        <div className={`px-4 py-3 rounded-xl text-sm font-medium ${syncMsg.startsWith("Error") ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-700 border border-green-200"}`}>
+          {syncMsg}
+        </div>
+      )}
+
+      {/* Mapping table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
+        {loading ? (
+          <div className="p-16 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+            <RefreshCw className="w-6 h-6 animate-spin" />
+            Loading mappings…
+          </div>
+        ) : mappings.length === 0 ? (
+          <div className="p-16 text-center">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-200" />
+            <p className="text-slate-600 font-semibold">No agency mappings yet</p>
+            <p className="text-slate-400 text-sm mt-1">
+              Click <strong>Sync from FC28</strong> to pull agency names from the latest FC28 upload.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-0 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+              <div className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">FC28 Agency Name</div>
+              <div className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Agency Settings Name</div>
+              <div className="px-5 py-3 w-20" />
+            </div>
+
+            <div className="divide-y divide-slate-50">
+              {mappings.map((m, i) => {
+                const dirty   = edits[m.id] !== (m.agencySettingName ?? "");
+                const isMapped = !!(m.agencySettingName);
+                return (
+                  <div
+                    key={m.id}
+                    className={`grid grid-cols-[1fr_1fr_auto] gap-0 items-center ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}
+                  >
+                    {/* FC28 name */}
+                    <div className="px-5 py-3 min-w-0">
+                      <span className={`inline-block max-w-full truncate px-2.5 py-1 rounded-lg text-xs font-medium font-mono ${
+                        isMapped ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-700"
+                      }`} title={m.fc28AgencyName}>
+                        {m.fc28AgencyName}
+                      </span>
+                    </div>
+
+                    {/* Dropdown */}
+                    <div className="px-5 py-2.5 min-w-0">
+                      <AgencyDropdown
+                        value={edits[m.id] ?? ""}
+                        options={options}
+                        onChange={v => setEdits(prev => ({ ...prev, [m.id]: v }))}
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="px-3 py-2.5 w-20 flex items-center gap-1 justify-end">
+                      {dirty && (
+                        <button
+                          onClick={() => save(m.id)}
+                          disabled={saving[m.id]}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        >
+                          <Save className="w-3 h-3" />
+                          {saving[m.id] ? "…" : "Save"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => remove(m.id)}
+                        className="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                        title="Remove mapping"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
