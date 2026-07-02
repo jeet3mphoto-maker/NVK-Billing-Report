@@ -79,9 +79,10 @@ export default function ExpectedActualPage() {
   const [search,  setSearch]  = useState("");
   const [loading, setLoading] = useState(false);
 
-  // visible raw columns (derive from first row)
-  const firstRow  = data?.rows[0];
-  const rawKeys   = firstRow ? Object.keys(firstRow.rawData) : [];
+  // visible raw columns — union of all keys across all loaded rows
+  const rawKeys = data
+    ? Array.from(new Set(data.rows.flatMap((r) => Object.keys(r.rawData ?? {}))))
+    : [];
   const FIXED     = ["childId","childName","center","centerId","familyId","familyName"];
 
   const load = useCallback(async (p = page, s = search) => {
