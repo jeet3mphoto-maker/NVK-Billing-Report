@@ -45,7 +45,7 @@ export async function POST() {
       );
 
     const BATCH = 2000;
-    let matched = 0, unmatched = 0, skipped = 0;
+    let matched = 0, unmatched = 0;
 
     for (let i = 0; i < rows.length; i += BATCH) {
       const chunk = rows.slice(i, i + BATCH);
@@ -54,8 +54,7 @@ export async function POST() {
       let pi = 1;
 
       for (const row of chunk) {
-        // Skip manually-set rows (entryBy = "Manual")
-        if (row.entryBy === "Manual") { skipped++; continue; }
+        // (all rows re-flagged, including Manual)
 
         const itemText = row.itemText ?? String((row.rawData as any)?.["Item"] ?? (row.rawData as any)?.["item"] ?? "").trim();
         const hit = matchItem(itemText, masters);
@@ -110,8 +109,7 @@ export async function POST() {
       total: rows.length,
       matched,
       unmatched,
-      skipped,
-      message: `Re-flagged ${rows.length} rows — ${matched} matched, ${unmatched} unmatched, ${skipped} manual (skipped)`,
+      message: `Re-flagged ${rows.length} rows — ${matched} matched, ${unmatched} unmatched`,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? "Reapply failed" }, { status: 500 });

@@ -453,7 +453,7 @@ export default function Fin14Page() {
   };
 
   const reapplyFlags = async () => {
-    if (!confirm("Re-apply Item Master rules to all FIN14 rows?\n\nManually-flagged rows (Entry By = Manual) will be skipped.")) return;
+    if (!confirm("Re-apply Item Master rules to all FIN14 rows?\n\nThis will overwrite existing flags including manually-set ones.")) return;
     setReapplying(true); setReapplyMsg(null);
     try {
       const res  = await fetch("/api/fin14/reapply-flags", { method: "POST" });
