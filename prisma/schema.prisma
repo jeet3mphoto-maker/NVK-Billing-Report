@@ -859,6 +859,32 @@ model RateSheetRow {
   @@index([latePMRateCardKey])
 }
 
+// ─── Expected vs Actual Billing (child-level aggregated from FIN14) ──────────
+
+model ChildBillingBatch {
+  id        String            @id @default(cuid())
+  createdAt DateTime          @default(now())
+  rowCount  Int               @default(0)
+  rows      ChildBillingRow[]
+}
+
+model ChildBillingRow {
+  id         Int                @id @default(autoincrement())
+  batchId    String
+  batch      ChildBillingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  childId    String?
+  childName  String?
+  center     String?
+  centerId   String?
+  familyId   String?
+  familyName String?
+  rawData    Json               @default("{}")
+  createdAt  DateTime           @default(now())
+
+  @@index([batchId])
+  @@index([childId])
+}
+
 // ─── Classroom Mapping (FC28 classroom → Rate Sheet item name) ───────────────
 
 model ClassroomMapping {
