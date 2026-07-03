@@ -16,7 +16,7 @@ const FC28_ORDER = [
   "Agency 2 (FC28)","Family Contrib 2 (FC28)","Estimated Contract Amount 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
   "Rate Card Key (FC28)","Revised Classroom (FC28)","Early AM Rate Card Key (FC28)","Late PM Rate Card Key (FC28)",
 ];
-const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];
+const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)","Core Weekly Logic"];
 const AGENCY_ORDER = [
   "Agency Name","Estimated Contract Amount",
   "Agency 1 - Revised Agency Name","Agency 1 - Agency Name (Agency)","Agency 1 - Contract Period (Agency)","Agency 1 - Agency Type (Agency)","Agency 1 - Agency Active","Agency 1 - Use Blackout Dates","Agency 1 - Discounts Permitted",

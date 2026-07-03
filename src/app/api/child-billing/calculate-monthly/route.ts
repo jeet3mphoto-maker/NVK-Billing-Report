@@ -164,12 +164,13 @@ export async function POST(req: NextRequest) {
             const agencyType1   = String(rd["Agency 1 - Agency Type (Agency)"] ?? "").trim();
             const copayPer1     = String(rd["Copay Period 1 (FC28)"] ?? "").trim();
             const copayAmt1Val  = toNum(rd["Copay Amt 1 (FC28)"]);
+            const coreWeeks     = toNum(rd["Core Weekly Logic"]) || 4.33;
 
             let agencyBillingNew = 0;
             if (agencyName !== "") {
               if      (contractPer1 === "Day")   agencyBillingNew = fmt2(estCA * totalDays);
               else if (contractPer1 === "Month")  agencyBillingNew = fmt2(estCA);
-              else if (contractPer1 === "Week")   agencyBillingNew = fmt2(estCA * 4.33);
+              else if (contractPer1 === "Week")   agencyBillingNew = fmt2(estCA * coreWeeks);
             }
 
             const copayEligible = agencyType1 === "Copay only" || agencyType1 === "Copay and Can charge full difference";
@@ -177,7 +178,7 @@ export async function POST(req: NextRequest) {
             if (copayEligible) {
               if      (copayPer1 === "Day")   copayBillingNew = fmt2(copayAmt1Val * totalDays);
               else if (copayPer1 === "Month")  copayBillingNew = fmt2(copayAmt1Val);
-              else if (contractPer1 === "Week") copayBillingNew = fmt2(copayAmt1Val * 4.33);
+              else if (contractPer1 === "Week") copayBillingNew = fmt2(copayAmt1Val * coreWeeks);
             }
 
             let customerLiability = 0;
@@ -194,19 +195,19 @@ export async function POST(req: NextRequest) {
 
             let finalAgencyBilling = 0;
             if      (isMonthly && finalDaysToBill === 22 && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew);
-            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 4.33 * totalMondays);
+            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / coreWeeks * totalMondays);
             else if (isMonthly && finalDaysToBill < 22   && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 21.67 * finalDaysToBill);
             else if (isWeekly  && finalWeeksToBill < 5   && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 21.67 * finalDaysToBill);
 
             let finalCopay = 0;
             if      (isMonthly && finalDaysToBill === 22 && hasAgency) finalCopay = fmt2(copayBillingNew);
-            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalCopay = fmt2(copayBillingNew / 4.33 * totalMondays);
+            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalCopay = fmt2(copayBillingNew / coreWeeks * totalMondays);
             else if (isMonthly && finalDaysToBill < 22   && hasAgency) finalCopay = fmt2(copayBillingNew / 21.67 * finalDaysToBill);
             else if (isWeekly  && finalWeeksToBill < 5   && hasAgency) finalCopay = fmt2(programFees / 21.67 * finalDaysToBill);
 
             let finalCustomerLiability = 0;
             if      (isMonthly && finalDaysToBill === 22) finalCustomerLiability = fmt2(customerLiability);
-            else if (isWeekly  && finalWeeksToBill === 5) finalCustomerLiability = fmt2(customerLiability / 4.33 * totalMondays);
+            else if (isWeekly  && finalWeeksToBill === 5) finalCustomerLiability = fmt2(customerLiability / coreWeeks * totalMondays);
             else if (isMonthly && finalDaysToBill < 22)   finalCustomerLiability = fmt2(customerLiability / 21.67 * finalDaysToBill);
             else if (isWeekly  && finalWeeksToBill < 5)   finalCustomerLiability = fmt2(customerLiability / 21.67 * finalDaysToBill);
 

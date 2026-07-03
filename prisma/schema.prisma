@@ -924,6 +924,19 @@ model AgencyNameMapping {
   @@index([fc28AgencyName])
 }
 
+// ─── Center Master (core weeks per center) ────────────────────────────────────
+
+model CenterMaster {
+  id          String   @id @default(cuid())
+  centerName  String   @unique
+  centerShort String?
+  coreWeeks   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([centerShort])
+}
+
 // ─── Classroom Mapping (FC28 classroom → Rate Sheet item name) ───────────────
 
 model ClassroomMapping {

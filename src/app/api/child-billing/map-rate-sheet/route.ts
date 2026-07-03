@@ -47,6 +47,11 @@ export async function POST(_req: NextRequest) {
         const classroomMap = new Map<string, string>();
         for (const c of classroomRows) { if (c.rateSheetItem) classroomMap.set(c.fc28Classroom, c.rateSheetItem); }
 
+        // Center Master: centerShort → coreWeeks
+        const centerRows: { centerShort: string | null; coreWeeks: number | null }[] = await db.centerMaster.findMany();
+        const coreWeeksMap = new Map<string, number>();
+        for (const c of centerRows) { if (c.centerShort && c.coreWeeks != null) coreWeeksMap.set(c.centerShort.trim(), c.coreWeeks); }
+
         controller.enqueue(sse({ phase: "init", message: `Loaded ${rateMap.size} Rate Sheet entries — collecting child rate keys…` }));
 
         const batch = await db.childBillingBatch.findFirst({ orderBy: { createdAt: "desc" } });
@@ -95,10 +100,14 @@ export async function POST(_req: NextRequest) {
             }
             if (!match) { unmapped++; continue; }
 
+            const centerShort = rateCardKey.split("|")[0];
+            const coreWeeks   = coreWeeksMap.get(centerShort);
+
             const patch: Record<string, string> = {
               "Item Name (Rate Sheet)":  match.itemName,
               "Item Value (Rate Sheet)": match.itemValue,
             };
+            if (coreWeeks != null) patch["Core Weekly Logic"] = String(coreWeeks);
             if (mappedKey !== rateCardKey) patch["Rate Card Key (FC28)"] = mappedKey;
 
             valueParts.push(`($${pi}::text, $${pi+1}::jsonb)`);
