@@ -48,7 +48,10 @@ export async function POST() {
       const amount    = parseFloat(String(amountRaw).replace(/[^0-9.-]/g, "")) || 0;
       const headCol   = `${row.majorHead} - ${row.subHead}`;
 
-      const key = childId || `${childName}__${centerId}`;
+      // When childId is blank, build a unique key from family + child name + center.
+      // Without familyId in the key, ALL blank-childId rows (e.g. agency payments)
+      // collapsed into one bucket, inflating Payment-Agency totals.
+      const key = childId || `${familyId}__${childName}__${centerId}`;
       if (!childMap.has(key)) {
         childMap.set(key, { childId, childName, center, centerId, familyId, familyName, amounts: new Map() });
       }
