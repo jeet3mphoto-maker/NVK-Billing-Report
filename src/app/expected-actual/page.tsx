@@ -12,8 +12,8 @@ const FC28_ORDER = [
   "Drop Off (FC28)","Pickup (FC28)","Early AM Care (FC28)","Late PM Care (FC28)","Program (FC28)",
   "Discount Type (FC28)","Discount Name (FC28)","Main Discount (FC28)","AM/PM Discount (FC28)","Total Discount (FC28)",
   "Billing Cycle (FC28)",
-  "Agency 1 (FC28)","Family Contrib 1 (FC28)","Contract Amt 1 (FC28)","Contract Period 1 (FC28)","Copay Amt 1 (FC28)","Copay Period 1 (FC28)",
-  "Agency 2 (FC28)","Family Contrib 2 (FC28)","Contract Amt 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
+  "Agency 1 (FC28)","Family Contrib 1 (FC28)","Estimated Contract Amount 1 (FC28)","Contract Period 1 (FC28)","Copay Amt 1 (FC28)","Copay Period 1 (FC28)",
+  "Agency 2 (FC28)","Family Contrib 2 (FC28)","Estimated Contract Amount 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
   "Rate Card Key (FC28)","Revised Classroom (FC28)","Early AM Rate Card Key (FC28)","Late PM Rate Card Key (FC28)",
 ];
 const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];

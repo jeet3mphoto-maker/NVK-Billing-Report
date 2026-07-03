@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
             const agencyType   = agency==="" ? "Private" : "Agency";
             const billingCycle = String(rd["Billing Cycle (FC28)"] ?? "").trim();
             const finalBilling = calcFinalBilling(billingCycle, finalDaysToBill, finalWeeksToBill, totalDays, totalMondays, grossBilling);
-            const agencyBilling= calcAgencyBilling(rd["Contract Amt 1 (FC28)"], rd["Contract Period 1 (FC28)"], totalDays, finalDaysToBill, finalWeeksToBill);
+            const agencyBilling= calcAgencyBilling(rd["Estimated Contract Amount 1 (FC28)"], rd["Contract Period 1 (FC28)"], totalDays, finalDaysToBill, finalWeeksToBill);
             const copayBilling = calcCopayBilling(rd["Copay Amt 1 (FC28)"], rd["Copay Period 1 (FC28)"], finalBilling, agencyBilling, totalDays, finalDaysToBill, finalWeeksToBill);
 
             const patch: Record<string,any> = {
