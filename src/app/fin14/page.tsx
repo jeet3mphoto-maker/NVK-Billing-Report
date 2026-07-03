@@ -658,32 +658,6 @@ export default function Fin14Page() {
             )}
 
             <button
-              onClick={reapplyFlags}
-              disabled={reapplying || !data?.total}
-              title={reapplyMsg ?? "Re-run Item Master rules on all rows (skips Manual)"}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-40 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${reapplying ? "animate-spin" : ""}`} />
-              {reapplying ? "Reapplying…" : reapplyMsg ? "✓ Reapplied" : "Reapply from Master"}
-            </button>
-
-            <button
-              onClick={mapFC28}
-              disabled={mapping || !data?.total}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 disabled:opacity-40 transition-colors"
-            >
-              <GitMerge className="w-3.5 h-3.5" />Map FC28 to FIN14
-            </button>
-
-            <button
-              onClick={mapRateSheet}
-              disabled={mappingRS || !data?.total}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-40 transition-colors"
-            >
-              <Receipt className="w-3.5 h-3.5" />Map Rate Sheet
-            </button>
-
-            <button
               onClick={calculateMonthlyFields}
               disabled={calcMonthly || !data?.total || !monthStart || !monthEnd}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40 transition-colors"
