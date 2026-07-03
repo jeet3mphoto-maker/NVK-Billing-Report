@@ -29,6 +29,7 @@ const CALC_ORDER = [
   "Gross Billing Amount","Agency Type",
   "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
   "Agency Billing","Copay Billing","Customer Liability",
+  "Final Agency Billing","Final Copay","Final Customer Liability","Final Expected Billing",
 ];
 const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...AGENCY_ORDER, ...CALC_ORDER]);
 

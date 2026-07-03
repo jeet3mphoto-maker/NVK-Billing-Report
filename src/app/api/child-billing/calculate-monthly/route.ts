@@ -187,6 +187,31 @@ export async function POST(req: NextRequest) {
               customerLiability = fmt2(programFees - copayBillingNew);
             }
 
+            // Final billing columns
+            const isMonthly = billingCycle === "Monthly" || billingCycle === "Semi-Monthly";
+            const isWeekly  = billingCycle === "Weekly";
+            const hasAgency = agencyName !== "";
+
+            let finalAgencyBilling = 0;
+            if      (isMonthly && finalDaysToBill === 22 && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew);
+            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 4.33 * totalMondays);
+            else if (isMonthly && finalDaysToBill < 22   && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 21.67 * finalDaysToBill);
+            else if (isWeekly  && finalWeeksToBill < 5   && hasAgency) finalAgencyBilling = fmt2(agencyBillingNew / 21.67 * finalDaysToBill);
+
+            let finalCopay = 0;
+            if      (isMonthly && finalDaysToBill === 22 && hasAgency) finalCopay = fmt2(copayBillingNew);
+            else if (isWeekly  && finalWeeksToBill === 5 && hasAgency) finalCopay = fmt2(copayBillingNew / 4.33 * totalMondays);
+            else if (isMonthly && finalDaysToBill < 22   && hasAgency) finalCopay = fmt2(copayBillingNew / 21.67 * finalDaysToBill);
+            else if (isWeekly  && finalWeeksToBill < 5   && hasAgency) finalCopay = fmt2(programFees / 21.67 * finalDaysToBill);
+
+            let finalCustomerLiability = 0;
+            if      (isMonthly && finalDaysToBill === 22) finalCustomerLiability = fmt2(customerLiability);
+            else if (isWeekly  && finalWeeksToBill === 5) finalCustomerLiability = fmt2(customerLiability / 4.33 * totalMondays);
+            else if (isMonthly && finalDaysToBill < 22)   finalCustomerLiability = fmt2(customerLiability / 21.67 * finalDaysToBill);
+            else if (isWeekly  && finalWeeksToBill < 5)   finalCustomerLiability = fmt2(customerLiability / 21.67 * finalDaysToBill);
+
+            const finalExpectedBilling = fmt2(finalAgencyBilling + finalCopay + finalCustomerLiability);
+
             const patch: Record<string,any> = {
               "Month Start Date": monthStartDate, "Month End Date": monthEndDate,
               "Total Days in Month": totalDays, "Total Mondays in Month": totalMondays,
@@ -201,6 +226,10 @@ export async function POST(req: NextRequest) {
               "Agency Billing": agencyBillingNew || "",
               "Copay Billing": copayBillingNew || "",
               "Customer Liability": customerLiability || "",
+              "Final Agency Billing": finalAgencyBilling || "",
+              "Final Copay": finalCopay || "",
+              "Final Customer Liability": finalCustomerLiability || "",
+              "Final Expected Billing": finalExpectedBilling || "",
             };
 
             valueParts.push(`($${pi}::int,$${pi+1}::jsonb)`);
