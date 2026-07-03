@@ -16,6 +16,7 @@ export default function CenterMasterPage() {
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch]   = useState("");
   const [saving, setSaving]   = useState<string | null>(null);
+  const [saved,  setSaved]    = useState<Record<string, boolean>>({});
   const [drafts, setDrafts]   = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -50,7 +51,9 @@ export default function CenterMasterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coreWeeks: drafts[id] }),
       });
-      if (!res.ok) { const j = await res.json(); alert(j.error); }
+      if (!res.ok) { const j = await res.json(); alert(j.error); return; }
+      setSaved(s => ({ ...s, [id]: true }));
+      setTimeout(() => setSaved(s => ({ ...s, [id]: false })), 2000);
     } finally { setSaving(null); }
   }
 
@@ -123,9 +126,11 @@ export default function CenterMasterPage() {
                   <button
                     onClick={() => save(r.id)}
                     disabled={saving === r.id}
-                    className="px-3 py-1 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-40"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg text-white disabled:opacity-40 transition-colors ${
+                      saved[r.id] ? "bg-blue-600" : "bg-green-600 hover:bg-green-700"
+                    }`}
                   >
-                    {saving === r.id ? "Saving…" : "Save"}
+                    {saving === r.id ? "Saving…" : saved[r.id] ? "✓ Saved" : "Save"}
                   </button>
                 </td>
               </tr>
