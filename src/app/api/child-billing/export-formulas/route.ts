@@ -118,6 +118,12 @@ export async function GET(req: NextRequest) {
         const ci = colIdx.get(col);
         return ci !== undefined ? colLetter(ci) + excelRow : '""';
       };
+      // Numeric cell ref — wraps in IFERROR(VALUE(...),0) so blanks become 0
+      const nv = (col: string): string => {
+        const ci = colIdx.get(col);
+        if (ci === undefined) return "0";
+        return `IFERROR(VALUE(${colLetter(ci) + excelRow}),0)`;
+      };
 
       const rowArr: any[] = headers.map(h => {
         // ── Fixed identity columns ──────────────────────────────────────────
@@ -130,13 +136,13 @@ export async function GET(req: NextRequest) {
 
         // ── Formula columns ─────────────────────────────────────────────────
         if (h === "Program Fees") return {
-          f: `${cf("Monthly Fees")}+${cf("Early AM Care Fees")}+${cf("Late PM Care Fees")}`,
+          f: `${nv("Monthly Fees")}+${nv("Early AM Care Fees")}+${nv("Late PM Care Fees")}`,
           t: "n",
         };
 
         if (h === "Agency Billing") {
           const an = cf("Agency Name"), cp = cf("Contract Period 1 (FC28)");
-          const ca = cf("Estimated Contract Amount"), td = cf("Total Days in Month"), cw = cf("Core Weekly Logic");
+          const ca = nv("Estimated Contract Amount"), td = nv("Total Days in Month"), cw = nv("Core Weekly Logic");
           return { t: "n", f:
             `IF(AND(${an}<>"",${cp}="Day"),${ca}*${td},` +
             `IF(AND(${an}<>"",${cp}="Month"),${ca},` +
@@ -146,8 +152,8 @@ export async function GET(req: NextRequest) {
 
         if (h === "Copay Billing") {
           const at = cf("Agency 1 - Agency Type (Agency)");
-          const cop = cf("Copay Amt 1 (FC28)"), cpp = cf("Copay Period 1 (FC28)");
-          const cp  = cf("Contract Period 1 (FC28)"), td = cf("Total Days in Month"), cw = cf("Core Weekly Logic");
+          const cop = nv("Copay Amt 1 (FC28)"), cpp = cf("Copay Period 1 (FC28)");
+          const cp  = cf("Contract Period 1 (FC28)"), td = nv("Total Days in Month"), cw = nv("Core Weekly Logic");
           const eligible = `OR(${at}="Copay only",${at}="Copay and Can charge full difference")`;
           return { t: "n", f:
             `IF(AND(${eligible},${cpp}="Day"),${cop}*${td},` +
@@ -158,7 +164,7 @@ export async function GET(req: NextRequest) {
 
         if (h === "Customer Liability") {
           const an = cf("Agency Name"), at = cf("Agency 1 - Agency Type (Agency)");
-          const pf = cf("Program Fees"),  cb = cf("Copay Billing");
+          const pf = nv("Program Fees"), cb = nv("Copay Billing");
           return { t: "n", f:
             `IF(${an}="",${pf},` +
             `IF(AND(${an}<>"",${at}="Copay and Can charge full difference"),${pf}-${cb},0))`,
@@ -166,47 +172,47 @@ export async function GET(req: NextRequest) {
         }
 
         if (h === "Final Agency Billing") {
-          const bc = cf("Billing Cycle (FC28)"), fd = cf("Final Days to be Billed");
-          const fw = cf("Final Weeks to be Billed"), an = cf("Agency Name");
-          const ab = cf("Agency Billing"), cw = cf("Core Weekly Logic"), tm = cf("Total Mondays in Month");
+          const bc = cf("Billing Cycle (FC28)"), fd = nv("Final Days to be Billed");
+          const fw = nv("Final Weeks to be Billed"), an = cf("Agency Name");
+          const ab = nv("Agency Billing"), cw = nv("Core Weekly Logic"), tm = nv("Total Mondays in Month");
           const monthly = `OR(${bc}="Monthly",${bc}="Semi-Monthly")`;
           return { t: "n", f:
             `IF(AND(${monthly},${fd}=22,${an}<>""),${ab},` +
-            `IF(AND(${bc}="Weekly",${fw}=5,${an}<>""),${ab}/${cw}*${tm},` +
+            `IF(AND(${bc}="Weekly",${fw}=5,${an}<>""),IF(${cw}=0,0,${ab}/${cw}*${tm}),` +
             `IF(AND(${monthly},${fd}<22,${an}<>""),${ab}/21.67*${fd},` +
             `IF(AND(${bc}="Weekly",${fw}<5,${an}<>""),${ab}/21.67*${fd},0))))`,
           };
         }
 
         if (h === "Final Copay") {
-          const bc = cf("Billing Cycle (FC28)"), fd = cf("Final Days to be Billed");
-          const fw = cf("Final Weeks to be Billed"), an = cf("Agency Name");
-          const cb = cf("Copay Billing"), pf = cf("Program Fees");
-          const cw = cf("Core Weekly Logic"), tm = cf("Total Mondays in Month");
+          const bc = cf("Billing Cycle (FC28)"), fd = nv("Final Days to be Billed");
+          const fw = nv("Final Weeks to be Billed"), an = cf("Agency Name");
+          const cb = nv("Copay Billing"), pf = nv("Program Fees");
+          const cw = nv("Core Weekly Logic"), tm = nv("Total Mondays in Month");
           const monthly = `OR(${bc}="Monthly",${bc}="Semi-Monthly")`;
           return { t: "n", f:
             `IF(AND(${monthly},${fd}=22,${an}<>""),${cb},` +
-            `IF(AND(${bc}="Weekly",${fw}=5,${an}<>""),${cb}/${cw}*${tm},` +
+            `IF(AND(${bc}="Weekly",${fw}=5,${an}<>""),IF(${cw}=0,0,${cb}/${cw}*${tm}),` +
             `IF(AND(${monthly},${fd}<22,${an}<>""),${cb}/21.67*${fd},` +
             `IF(AND(${bc}="Weekly",${fw}<5,${an}<>""),${pf}/21.67*${fd},0))))`,
           };
         }
 
         if (h === "Final Customer Liability") {
-          const bc = cf("Billing Cycle (FC28)"), fd = cf("Final Days to be Billed");
-          const fw = cf("Final Weeks to be Billed"), cl = cf("Customer Liability");
-          const cw = cf("Core Weekly Logic"), tm = cf("Total Mondays in Month");
+          const bc = cf("Billing Cycle (FC28)"), fd = nv("Final Days to be Billed");
+          const fw = nv("Final Weeks to be Billed"), cl = nv("Customer Liability");
+          const cw = nv("Core Weekly Logic"), tm = nv("Total Mondays in Month");
           const monthly = `OR(${bc}="Monthly",${bc}="Semi-Monthly")`;
           return { t: "n", f:
             `IF(AND(${monthly},${fd}=22),${cl},` +
-            `IF(AND(${bc}="Weekly",${fw}=5),${cl}/${cw}*${tm},` +
+            `IF(AND(${bc}="Weekly",${fw}=5),IF(${cw}=0,0,${cl}/${cw}*${tm}),` +
             `IF(AND(${monthly},${fd}<22),${cl}/21.67*${fd},` +
             `IF(AND(${bc}="Weekly",${fw}<5),${cl}/21.67*${fd},0))))`,
           };
         }
 
         if (h === "Final Expected Billing") return {
-          f: `${cf("Final Agency Billing")}+${cf("Final Copay")}+${cf("Final Customer Liability")}`,
+          f: `${nv("Final Agency Billing")}+${nv("Final Copay")}+${nv("Final Customer Liability")}`,
           t: "n",
         };
 
