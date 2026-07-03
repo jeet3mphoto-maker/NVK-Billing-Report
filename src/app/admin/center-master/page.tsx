@@ -15,8 +15,10 @@ export default function CenterMasterPage() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch]   = useState("");
-  const [saving, setSaving]   = useState<string | null>(null);
-  const [saved,  setSaved]    = useState<Record<string, boolean>>({});
+  const [saving,   setSaving]   = useState<string | null>(null);
+  const [savingAll,setSavingAll]= useState(false);
+  const [savedAll, setSavedAll] = useState(false);
+  const [saved,    setSaved]    = useState<Record<string, boolean>>({});
   const [drafts, setDrafts]   = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -41,6 +43,23 @@ export default function CenterMasterPage() {
       if (json.error) { alert(json.error); return; }
       await load();
     } finally { setSyncing(false); }
+  }
+
+  async function saveAll() {
+    setSavingAll(true);
+    try {
+      await Promise.all(
+        rows.map(r =>
+          fetch(`/api/center-master/${r.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ coreWeeks: drafts[r.id] }),
+          })
+        )
+      );
+      setSavedAll(true);
+      setTimeout(() => setSavedAll(false), 2000);
+    } finally { setSavingAll(false); }
   }
 
   async function save(id: string) {
@@ -75,6 +94,10 @@ export default function CenterMasterPage() {
           <button onClick={load} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+          <button onClick={saveAll} disabled={savingAll || rows.length === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-colors ${savedAll ? "bg-blue-600" : "bg-green-600 hover:bg-green-700"}`}>
+            {savingAll ? "Saving…" : savedAll ? "✓ All Saved" : "Save All"}
           </button>
           <button onClick={sync} disabled={syncing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-40">
