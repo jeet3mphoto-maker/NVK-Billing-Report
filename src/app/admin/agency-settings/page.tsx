@@ -150,7 +150,7 @@ export default function AgencySettingsPage() {
                   {paged.map((r, i) => (
                     <tr key={r.id} className={i % 2 === 1 ? "bg-slate-50/40" : ""}>
                       <td className="px-4 py-2.5 font-medium text-slate-800 whitespace-nowrap">{r.name ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{r.center ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{r.center ? r.center.split(",")[0].trim() : "—"}</td>
                       <td className="px-4 py-2.5">
                         {r.active?.toLowerCase() === "yes" ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">

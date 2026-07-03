@@ -19,7 +19,7 @@ export async function GET() {
       ["Name", "Center", "Active", "Contract Period", "Type", "Use Blackout Dates", "Discounts Permitted"],
       ...rows.map((r: any) => [
         r.name ?? "",
-        r.center ?? "",
+        r.center ? r.center.split(",")[0].trim() : "",
         r.active ?? "",
         r.contractPeriod ?? "",
         r.type ?? "",
