@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     const rows = await db.agencySetting.findMany({
       where:   { batchId: batch.id },
-      orderBy: [{ center: "asc" }, { name: "asc" }],
+      orderBy: [{ name: "asc" }, { center: "asc" }],
     });
 
     const names: string[] = Array.from(
