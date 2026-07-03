@@ -115,6 +115,13 @@ export async function POST(_req: NextRequest) {
             const agencyName = [ag1Name, ag2Name].filter(Boolean).join(", ");
             if (agencyName) patch["Agency Name"] = agencyName;
 
+            // Sum Estimated Contract Amount 1 + 2
+            const toNum = (v: any) => { const n = parseFloat(String(v ?? "").replace(/[^0-9.-]/g, "")); return isNaN(n) ? 0 : n; };
+            const ca1 = toNum(rd["Estimated Contract Amount 1 (FC28)"]);
+            const ca2 = toNum(rd["Estimated Contract Amount 2 (FC28)"]);
+            const totalCA = Math.round((ca1 + ca2) * 100) / 100;
+            if (totalCA) patch["Estimated Contract Amount"] = String(totalCA);
+
             valueParts.push(`($${pi}::int, $${pi + 1}::jsonb)`);
             params.push(row.id, JSON.stringify(patch));
             pi += 2;

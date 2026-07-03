@@ -18,7 +18,7 @@ const FC28_ORDER = [
 ];
 const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];
 const AGENCY_ORDER = [
-  "Agency Name",
+  "Agency Name","Estimated Contract Amount",
   "Agency 1 - Revised Agency Name","Agency 1 - Agency Name (Agency)","Agency 1 - Contract Period (Agency)","Agency 1 - Agency Type (Agency)","Agency 1 - Agency Active","Agency 1 - Use Blackout Dates","Agency 1 - Discounts Permitted",
   "Agency 2 - Revised Agency Name","Agency 2 - Agency Name (Agency)","Agency 2 - Contract Period (Agency)","Agency 2 - Agency Type (Agency)","Agency 2 - Agency Active","Agency 2 - Use Blackout Dates","Agency 2 - Discounts Permitted",
 ];
