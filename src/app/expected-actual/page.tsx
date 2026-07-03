@@ -13,18 +13,20 @@ const FC28_ORDER = [
   "Discount Type (FC28)","Discount Name (FC28)","Main Discount (FC28)","AM/PM Discount (FC28)","Total Discount (FC28)",
   "Billing Cycle (FC28)",
   "Agency 1 (FC28)","Family Contrib 1 (FC28)","Contract Amt 1 (FC28)","Contract Period 1 (FC28)","Copay Amt 1 (FC28)","Copay Period 1 (FC28)",
-  "Agency 2 (FC28)","Contract Amt 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
+  "Agency 2 (FC28)","Family Contrib 2 (FC28)","Contract Amt 2 (FC28)","Contract Period 2 (FC28)","Copay Amt 2 (FC28)","Copay Period 2 (FC28)",
   "Rate Card Key (FC28)","Revised Classroom (FC28)","Early AM Rate Card Key (FC28)","Late PM Rate Card Key (FC28)",
 ];
 const RATE_SHEET_ORDER = ["Item Name (Rate Sheet)","Item Value (Rate Sheet)"];
 const AGENCY_ORDER = [
+  "Agency Name",
   "Agency 1 - Revised Agency Name","Agency 1 - Agency Name (Agency)","Agency 1 - Contract Period (Agency)","Agency 1 - Agency Type (Agency)","Agency 1 - Agency Active","Agency 1 - Use Blackout Dates","Agency 1 - Discounts Permitted",
   "Agency 2 - Revised Agency Name","Agency 2 - Agency Name (Agency)","Agency 2 - Contract Period (Agency)","Agency 2 - Agency Type (Agency)","Agency 2 - Agency Active","Agency 2 - Use Blackout Dates","Agency 2 - Discounts Permitted",
 ];
 const CALC_ORDER = [
   "Month Start Date","Month End Date","Total Days in Month","Total Mondays in Month",
   "Final Start Date","Final End Date","Final Days to be Billed","Final Weeks to be Billed",
-  "Early AM Care Fees","Late PM Care Fees","Gross Billing Amount","Agency Type",
+  "Monthly Fees","Early AM Care Fees","Late PM Care Fees","Program Fees",
+  "Gross Billing Amount","Agency Type",
   "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
 ];
 const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...AGENCY_ORDER, ...CALC_ORDER]);

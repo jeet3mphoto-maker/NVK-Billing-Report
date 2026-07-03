@@ -109,6 +109,12 @@ export async function POST(_req: NextRequest) {
             if (Object.keys(r1).length > 0) matched1++;
             if (Object.keys(r2).length > 0) matched2++;
 
+            // Concat canonical agency names (ignore blank)
+            const ag1Name = r1["Agency Name (Agency)"] ?? r1["Revised Agency Name"] ?? "";
+            const ag2Name = r2["Agency Name (Agency)"] ?? r2["Revised Agency Name"] ?? "";
+            const agencyName = [ag1Name, ag2Name].filter(Boolean).join(", ");
+            if (agencyName) patch["Agency Name"] = agencyName;
+
             valueParts.push(`($${pi}::int, $${pi + 1}::jsonb)`);
             params.push(row.id, JSON.stringify(patch));
             pi += 2;

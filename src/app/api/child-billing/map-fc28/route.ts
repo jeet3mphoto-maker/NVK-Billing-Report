@@ -94,6 +94,7 @@ export async function POST() {
               "Copay Amt 1 (FC28)":        s(fc28.copayAmt1),
               "Copay Period 1 (FC28)":     s(fc28.copayPeriod1),
               "Agency 2 (FC28)":           s(fc28.agency2),
+              "Family Contrib 2 (FC28)":   s(fc28.familyContrib2),
               "Contract Amt 2 (FC28)":     s(fc28.contractAmt2),
               "Contract Period 2 (FC28)":  s(fc28.contractPeriod2),
               "Copay Amt 2 (FC28)":        s(fc28.copayAmt2),

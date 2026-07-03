@@ -148,7 +148,8 @@ export async function POST(req: NextRequest) {
             const finalWeeksToBill = fsdEqualsFed ? 0 : (fsd&&fed ? mondaysCount(fsd,fed) : 0);
 
             const monthlyFees  = rd["Item Value (Rate Sheet)"] ?? "";
-            const grossBilling = toNum(monthlyFees)+toNum(earlyAMFees)+toNum(latePMFees);
+            const programFees  = fmt2(toNum(monthlyFees)+toNum(earlyAMFees)+toNum(latePMFees));
+            const grossBilling = programFees;
             const agency       = String(rd["Agency 1 (FC28)"] ?? "").trim();
             const agencyType   = agency==="" ? "Private" : "Agency";
             const billingCycle = String(rd["Billing Cycle (FC28)"] ?? "").trim();
@@ -160,8 +161,10 @@ export async function POST(req: NextRequest) {
               "Month Start Date": monthStartDate, "Month End Date": monthEndDate,
               "Total Days in Month": totalDays, "Total Mondays in Month": totalMondays,
               "Final Start Date": fmtDate(fsd), "Final End Date": fmtDate(fed),
-              "Early AM Care Fees": earlyAMFees, "Late PM Care Fees": latePMFees,
               "Final Days to be Billed": finalDaysToBill, "Final Weeks to be Billed": finalWeeksToBill,
+              "Monthly Fees": monthlyFees,
+              "Early AM Care Fees": earlyAMFees, "Late PM Care Fees": latePMFees,
+              "Program Fees": programFees || "",
               "Gross Billing Amount": grossBilling||"", "Agency Type": agencyType,
               "Final Billing Amount": finalBilling||"", "Final Agency Billing": agencyBilling||"",
               "Estimated Copay Billing": copayBilling||"",
