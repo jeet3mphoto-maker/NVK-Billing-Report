@@ -242,6 +242,14 @@ export default function ExpectedActualPage() {
               <Download className="w-4 h-4" />
               Download Excel
             </a>
+            <a
+              href="/api/child-billing/export-formulas"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition"
+              title="Download Excel with live formulas for all calculated columns"
+            >
+              <Download className="w-4 h-4" />
+              Download with Formulas
+            </a>
             <button
               onClick={handleDelete}
               className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-lg border border-red-200 transition"
