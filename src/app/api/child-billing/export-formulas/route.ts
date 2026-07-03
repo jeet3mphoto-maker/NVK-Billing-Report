@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 300;
@@ -55,7 +55,7 @@ const FORMULA_COLS = [
 const FIXED = ["Child ID","Child Name","Center","Center ID","Family ID","Family Name"];
 const KNOWN_SET = new Set([...FIXED, ...FC28_ORDER, ...RATE_SHEET_ORDER, ...AGENCY_ORDER, ...CALC_VALUE_COLS, ...FORMULA_COLS]);
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const batch = await db.childBillingBatch.findFirst({ orderBy: { createdAt: "desc" } });
     if (!batch) return NextResponse.json({ error: "No child billing data found" }, { status: 404 });
@@ -66,6 +66,9 @@ export async function GET() {
       batch.id
     );
     if (!rows.length) return NextResponse.json({ error: "No rows to export" }, { status: 404 });
+
+    const selectedCols = new URL(req.url).searchParams.get("cols");
+    const selectedSet  = selectedCols ? new Set(selectedCols.split(",").map(c => c.trim()).filter(Boolean)) : null;
 
     // Dynamic FIN14 billing head columns (anything in rawData not in our known set)
     const headColsSet = new Set<string>();
@@ -95,7 +98,8 @@ export async function GET() {
         return rd[col] != null;
       });
     };
-    const headers = allCols.filter(hasData);
+    const allHeaders = allCols.filter(hasData);
+    const headers = selectedSet ? allHeaders.filter(h => selectedSet.has(h) || formulaSet.has(h) || fixedSet.has(h)) : allHeaders;
 
     // Column index map
     const colIdx = new Map<string, number>();

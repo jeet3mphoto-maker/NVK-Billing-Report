@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 300;
@@ -25,8 +25,8 @@ const CALC_COLS = [
   "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
 ];
 
-// GET /api/child-billing/export
-export async function GET() {
+// GET /api/child-billing/export?cols=col1,col2,...
+export async function GET(req: NextRequest) {
   try {
     const batch = await db.childBillingBatch.findFirst({ orderBy: { createdAt: "desc" } });
     if (!batch) return NextResponse.json({ error: "No child billing data found" }, { status: 404 });
@@ -38,6 +38,9 @@ export async function GET() {
     );
     if (!rows.length) return NextResponse.json({ error: "No rows to export" }, { status: 404 });
 
+    const selectedCols = new URL(req.url).searchParams.get("cols");
+    const selectedSet  = selectedCols ? new Set(selectedCols.split(",").map(c => c.trim()).filter(Boolean)) : null;
+
     // Collect all distinct rawData keys to find billing head columns
     const knownSet = new Set([...FC28_COLS, ...CALC_COLS]);
     const headColsSet = new Set<string>();
@@ -48,16 +51,16 @@ export async function GET() {
     }
     const headCols = Array.from(headColsSet).sort();
 
-    // Fixed identity cols + dynamic billing head cols + fc28 cols + calc cols
-    const fixedHeaders   = ["Child ID","Child Name","Center","Center ID","Family ID","Family Name"];
-    const allRawPresent  = (cols: string[]) => cols.filter(c => rows.some(r => (r.rawData??{})[c] != null));
+    const fixedHeaders  = ["Child ID","Child Name","Center","Center ID","Family ID","Family Name"];
+    const allRawPresent = (cols: string[]) => cols.filter(c => rows.some(r => (r.rawData??{})[c] != null));
 
-    const headers = [
+    const allHeaders = [
       ...fixedHeaders,
       ...headCols,
       ...allRawPresent(FC28_COLS),
       ...allRawPresent(CALC_COLS),
     ];
+    const headers = selectedSet ? allHeaders.filter(h => selectedSet.has(h)) : allHeaders;
 
     const data: any[][] = [headers];
     for (const row of rows) {

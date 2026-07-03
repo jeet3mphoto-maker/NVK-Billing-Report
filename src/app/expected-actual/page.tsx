@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt, Building2 } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { BarChart3, RefreshCw, GitMerge, Calculator, Download, Search, Trash2, ChevronLeft, ChevronRight, Receipt, Building2, SlidersHorizontal, X, CheckSquare, Square } from "lucide-react";
 
 // ── column ordering ────────────────────────────────────────────────────────
 const FC28_ORDER = [
@@ -120,6 +120,35 @@ export default function ExpectedActualPage() {
   const [search,  setSearch]  = useState("");
   const [loading, setLoading] = useState(false);
 
+  // column selector
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+  const [colGroups, setColGroups]         = useState<{ label: string; cols: string[] }[]>([]);
+  const [selectedCols, setSelectedCols]   = useState<Set<string>>(new Set());
+  const [colsLoading, setColsLoading]     = useState(false);
+
+  const openColPicker = async () => {
+    setColPickerOpen(true);
+    if (colGroups.length > 0) return;
+    setColsLoading(true);
+    try {
+      const res  = await fetch("/api/child-billing/columns");
+      const json = await res.json();
+      setColGroups(json.groups ?? []);
+      // default: all selected
+      const all = new Set<string>();
+      for (const g of json.groups ?? []) for (const c of g.cols) all.add(c);
+      setSelectedCols(all);
+    } finally { setColsLoading(false); }
+  };
+
+  const toggleCol  = (col: string) => setSelectedCols(s => { const n = new Set(s); n.has(col) ? n.delete(col) : n.add(col); return n; });
+  const toggleGroup = (cols: string[], on: boolean) => setSelectedCols(s => { const n = new Set(s); cols.forEach(c => on ? n.add(c) : n.delete(c)); return n; });
+  const allCols    = colGroups.flatMap(g => g.cols);
+  const selectAll  = () => setSelectedCols(new Set(allCols));
+  const clearAll   = () => setSelectedCols(new Set());
+
+  const colsParam  = () => selectedCols.size > 0 ? `?cols=${[...selectedCols].join(",")}` : "";
+
   // all rawData keys across the entire batch — sorted in fixed order
   const rawKeys: string[] = sortColumns((data as any)?.allColumns ?? []);
   const FIXED     = ["childId","childName","center","centerId","familyId","familyName"];
@@ -235,15 +264,23 @@ export default function ExpectedActualPage() {
 
           {/* Download */}
           <div className="flex flex-col gap-2 self-start mt-1">
+            <button
+              onClick={openColPicker}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg shadow-sm transition"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Select Columns
+              {selectedCols.size > 0 && <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{selectedCols.size}</span>}
+            </button>
             <a
-              href="/api/child-billing/export"
+              href={`/api/child-billing/export${colsParam()}`}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow transition"
             >
               <Download className="w-4 h-4" />
               Download Excel
             </a>
             <a
-              href="/api/child-billing/export-formulas"
+              href={`/api/child-billing/export-formulas${colsParam()}`}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition"
               title="Download Excel with live formulas for all calculated columns"
             >
@@ -346,6 +383,99 @@ export default function ExpectedActualPage() {
         )}
       </div>
     </div>
+
+    {/* ── Column Selector Modal ───────────────────────────────────────────── */}
+    {colPickerOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setColPickerOpen(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-blue-600" /> Select Columns to Export
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">{selectedCols.size} of {allCols.length} columns selected</p>
+            </div>
+            <button onClick={() => setColPickerOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Select All / Clear All */}
+          <div className="flex gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <button onClick={selectAll} className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              <CheckSquare className="w-3.5 h-3.5" /> Select All
+            </button>
+            <span className="text-gray-300">|</span>
+            <button onClick={clearAll} className="text-xs font-semibold text-gray-500 hover:underline flex items-center gap-1">
+              <Square className="w-3.5 h-3.5" /> Clear All
+            </button>
+          </div>
+
+          {/* Groups */}
+          <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+            {colsLoading && <p className="text-center text-gray-400 py-8">Loading columns…</p>}
+            {colGroups.map(group => {
+              const groupSelected = group.cols.filter(c => selectedCols.has(c)).length;
+              const allGroupSelected = groupSelected === group.cols.length;
+              return (
+                <div key={group.label}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      onClick={() => toggleGroup(group.cols, !allGroupSelected)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-gray-700 uppercase tracking-wide hover:text-blue-600"
+                    >
+                      {allGroupSelected
+                        ? <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                        : groupSelected > 0
+                          ? <div className="w-3.5 h-3.5 border-2 border-blue-400 rounded-sm bg-blue-100" />
+                          : <Square className="w-3.5 h-3.5 text-gray-400" />
+                      }
+                      {group.label}
+                    </button>
+                    <span className="text-xs text-gray-400">({groupSelected}/{group.cols.length})</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 ml-1">
+                    {group.cols.map(col => (
+                      <label key={col} className="flex items-center gap-2 text-xs text-gray-700 hover:text-gray-900 cursor-pointer py-0.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedCols.has(col)}
+                          onChange={() => toggleCol(col)}
+                          className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5"
+                        />
+                        <span className="truncate" title={col}>{col}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl gap-3">
+            <span className="text-xs text-gray-500">{selectedCols.size} columns selected</span>
+            <div className="flex gap-2">
+              <a
+                href={`/api/child-billing/export${colsParam()}`}
+                onClick={() => setColPickerOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition"
+              >
+                <Download className="w-4 h-4" /> Download Excel
+              </a>
+              <a
+                href={`/api/child-billing/export-formulas${colsParam()}`}
+                onClick={() => setColPickerOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition"
+              >
+                <Download className="w-4 h-4" /> With Formulas
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
 
