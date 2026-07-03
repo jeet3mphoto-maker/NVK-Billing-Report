@@ -157,6 +157,36 @@ export async function POST(req: NextRequest) {
             const agencyBilling= calcAgencyBilling(rd["Estimated Contract Amount 1 (FC28)"], rd["Contract Period 1 (FC28)"], totalDays, finalDaysToBill, finalWeeksToBill);
             const copayBilling = calcCopayBilling(rd["Copay Amt 1 (FC28)"], rd["Copay Period 1 (FC28)"], finalBilling, agencyBilling, totalDays, finalDaysToBill, finalWeeksToBill);
 
+            // New computed columns
+            const agencyName    = String(rd["Agency Name"] ?? "").trim();
+            const contractPer1  = String(rd["Contract Period 1 (FC28)"] ?? "").trim();
+            const estCA         = toNum(rd["Estimated Contract Amount"]);
+            const agencyType1   = String(rd["Agency 1 - Agency Type (Agency)"] ?? "").trim();
+            const copayPer1     = String(rd["Copay Period 1 (FC28)"] ?? "").trim();
+            const copayAmt1Val  = toNum(rd["Copay Amt 1 (FC28)"]);
+
+            let agencyBillingNew = 0;
+            if (agencyName !== "") {
+              if      (contractPer1 === "Day")   agencyBillingNew = fmt2(estCA * totalDays);
+              else if (contractPer1 === "Month")  agencyBillingNew = fmt2(estCA);
+              else if (contractPer1 === "Week")   agencyBillingNew = fmt2(estCA * 4.33);
+            }
+
+            const copayEligible = agencyType1 === "Copay only" || agencyType1 === "Copay and Can charge full difference";
+            let copayBillingNew = 0;
+            if (copayEligible) {
+              if      (copayPer1 === "Day")   copayBillingNew = fmt2(copayAmt1Val * totalDays);
+              else if (copayPer1 === "Month")  copayBillingNew = fmt2(copayAmt1Val);
+              else if (contractPer1 === "Week") copayBillingNew = fmt2(copayAmt1Val * 4.33);
+            }
+
+            let customerLiability = 0;
+            if (agencyName === "") {
+              customerLiability = fmt2(programFees);
+            } else if (agencyType1 === "Copay and Can charge full difference") {
+              customerLiability = fmt2(programFees - copayBillingNew);
+            }
+
             const patch: Record<string,any> = {
               "Month Start Date": monthStartDate, "Month End Date": monthEndDate,
               "Total Days in Month": totalDays, "Total Mondays in Month": totalMondays,
@@ -168,6 +198,9 @@ export async function POST(req: NextRequest) {
               "Gross Billing Amount": grossBilling||"", "Agency Type": agencyType,
               "Final Billing Amount": finalBilling||"", "Final Agency Billing": agencyBilling||"",
               "Estimated Copay Billing": copayBilling||"",
+              "Agency Billing": agencyBillingNew || "",
+              "Copay Billing": copayBillingNew || "",
+              "Customer Liability": customerLiability || "",
             };
 
             valueParts.push(`($${pi}::int,$${pi+1}::jsonb)`);

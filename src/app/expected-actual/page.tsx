@@ -28,6 +28,7 @@ const CALC_ORDER = [
   "Monthly Fees","Early AM Care Fees","Late PM Care Fees","Program Fees",
   "Gross Billing Amount","Agency Type",
   "Final Billing Amount","Final Agency Billing","Estimated Copay Billing",
+  "Agency Billing","Copay Billing","Customer Liability",
 ];
 const KNOWN_SET = new Set([...FC28_ORDER, ...RATE_SHEET_ORDER, ...AGENCY_ORDER, ...CALC_ORDER]);
 
