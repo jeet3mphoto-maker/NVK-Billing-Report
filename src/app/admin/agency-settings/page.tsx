@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Building2, Search, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, Search, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, XCircle, Download } from "lucide-react";
 
 interface AgencyRow {
   id: string;
@@ -72,14 +72,23 @@ export default function AgencySettingsPage() {
             <p className="text-sm text-slate-500">Agency data loaded from the Agencies sheet in Rate Sheet files</p>
           </div>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/agency-settings/download"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download Excel
+          </a>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Batch info */}
