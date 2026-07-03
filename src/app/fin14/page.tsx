@@ -658,14 +658,6 @@ export default function Fin14Page() {
             )}
 
             <button
-              onClick={calculateMonthlyFields}
-              disabled={calcMonthly || !data?.total || !monthStart || !monthEnd}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40 transition-colors"
-            >
-              <Calculator className="w-3.5 h-3.5" />Calculate Monthly
-            </button>
-
-            <button
               onClick={exportExcel}
               disabled={downloading || !data?.total}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors"
