@@ -118,11 +118,11 @@ export async function GET(req: NextRequest) {
         const ci = colIdx.get(col);
         return ci !== undefined ? colLetter(ci) + excelRow : '""';
       };
-      // Numeric cell ref — wraps in IFERROR(VALUE(...),0) so blanks become 0
+      // Numeric cell ref — IFERROR(ref+0,0) handles blank cells, string numbers, and true numbers
       const nv = (col: string): string => {
         const ci = colIdx.get(col);
         if (ci === undefined) return "0";
-        return `IFERROR(VALUE(${colLetter(ci) + excelRow}),0)`;
+        return `IFERROR(${colLetter(ci) + excelRow}+0,0)`;
       };
 
       const rowArr: any[] = headers.map(h => {
