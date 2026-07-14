@@ -180,6 +180,7 @@ export default function ExpectedActualPage() {
   const totalPages = data ? Math.ceil(data.total / (data.pageSize ?? 50)) : 0;
 
   return (
+    <>
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
@@ -385,6 +386,7 @@ export default function ExpectedActualPage() {
     </div>
 
     {/* ── Column Selector Modal ───────────────────────────────────────────── */}
+    </>
     {colPickerOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setColPickerOpen(false)}>
         <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
