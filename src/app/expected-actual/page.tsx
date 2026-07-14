@@ -386,7 +386,6 @@ export default function ExpectedActualPage() {
     </div>
 
     {/* ── Column Selector Modal ───────────────────────────────────────────── */}
-    </>
     {colPickerOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setColPickerOpen(false)}>
         <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -478,6 +477,7 @@ export default function ExpectedActualPage() {
         </div>
       </div>
     )}
+    </>
   );
 }
 
