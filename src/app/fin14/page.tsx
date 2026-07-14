@@ -5,6 +5,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, Search, Filter,
   Save, ChevronLeft, ChevronRight, Pencil, X, Download,
   GitMerge, Upload, FileSpreadsheet, Trash2, Receipt, Calculator,
+  SlidersHorizontal, CheckSquare, Square,
 } from "lucide-react";
 
 const MAJOR_HEADS = ["Adjustments", "Billing", "Payment"];
@@ -340,6 +341,12 @@ export default function Fin14Page() {
   const [reapplying,   setReapplying]   = useState(false);
   const [reapplyMsg,   setReapplyMsg]   = useState<string | null>(null);
 
+  // Column selector for FC28 export
+  const [fin14ColPickerOpen, setFin14ColPickerOpen] = useState(false);
+  const [fin14ColGroups, setFin14ColGroups]         = useState<{ label: string; cols: string[] }[]>([]);
+  const [fin14SelCols, setFin14SelCols]             = useState<string[]>([]);   // ordered
+  const [fin14ColsLoading, setFin14ColsLoading]     = useState(false);
+
   // Map FC28
   const [mapping,     setMapping]     = useState(false);
   const [mapResult,   setMapResult]   = useState<string | null>(null);
@@ -464,6 +471,37 @@ export default function Fin14Page() {
     } catch (e: any) { setReapplyMsg("Error: " + e.message); }
     finally { setReapplying(false); }
   };
+
+  const openFin14ColPicker = async () => {
+    setFin14ColPickerOpen(true);
+    if (fin14ColGroups.length > 0) return;
+    setFin14ColsLoading(true);
+    try {
+      const res  = await fetch("/api/fin14/columns");
+      const json = await res.json();
+      setFin14ColGroups(json.groups ?? []);
+      const all: string[] = [];
+      for (const g of json.groups ?? []) for (const c of g.cols) all.push(c);
+      setFin14SelCols(all);
+    } finally { setFin14ColsLoading(false); }
+  };
+
+  const toggleFin14Col = (col: string) =>
+    setFin14SelCols(prev =>
+      prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+    );
+
+  const toggleFin14Group = (cols: string[], on: boolean) =>
+    setFin14SelCols(prev => {
+      if (on) {
+        const set = new Set(prev);
+        const adds = cols.filter(c => !set.has(c));
+        return [...prev, ...adds];
+      }
+      return prev.filter(c => !cols.includes(c));
+    });
+
+  const fin14AllCols = fin14ColGroups.flatMap(g => g.cols);
 
   const mapFC28 = async () => {
     setMapping(true); setMapResult(null); setMapProgress(null);
@@ -602,13 +640,25 @@ export default function Fin14Page() {
             {data ? <><span className="font-semibold text-gray-600">{data.total.toLocaleString()}</span> rows in database</> : "Loading…"}
           </p>
         </div>
-        <button
-          onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm hover:brightness-110 transition-all"
-          style={{ background: "#003887" }}
-        >
-          <Upload className="w-4 h-4" /> Upload FIN14
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={mapFC28}
+            disabled={mapping || !data?.total}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm hover:brightness-110 transition-all disabled:opacity-40"
+            style={{ background: "#7c3aed" }}
+          >
+            {mapping
+              ? <><RefreshCw className="w-4 h-4 animate-spin" />Mapping…</>
+              : <><GitMerge className="w-4 h-4" />Map FC28 to FIN14</>}
+          </button>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm hover:brightness-110 transition-all"
+            style={{ background: "#003887" }}
+          >
+            <Upload className="w-4 h-4" /> Upload FIN14
+          </button>
+        </div>
       </div>
 
       <div className="p-4 space-y-3 w-full">
@@ -665,6 +715,17 @@ export default function Fin14Page() {
               {downloading
                 ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Downloading…</>
                 : <><Download className="w-3.5 h-3.5" />Download Excel</>}
+            </button>
+            <button
+              onClick={openFin14ColPicker}
+              disabled={!data?.total}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-40 transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Export with FC28
+              {fin14SelCols.length > 0 && (
+                <span className="ml-1 text-[10px] bg-teal-200 text-teal-800 px-1.5 py-0.5 rounded-full">{fin14SelCols.length}</span>
+              )}
             </button>
           </div>
 
@@ -980,6 +1041,114 @@ export default function Fin14Page() {
       )}
       {showUpload && (
         <UploadModal onClose={() => setShowUpload(false)} onDone={() => { setPage(1); load(); }} />
+      )}
+
+      {/* ── FC28 Export Column Selector Modal ─────────────────────────────── */}
+      {fin14ColPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setFin14ColPickerOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[720px] max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-teal-600" /> Select &amp; Order Columns for Export
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Columns export in the order they are selected. Uncheck to remove.</p>
+              </div>
+              <button onClick={() => setFin14ColPickerOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Select All / Clear All */}
+            <div className="flex gap-2 px-5 py-2.5 border-b border-gray-100 bg-gray-50">
+              <button onClick={() => setFin14SelCols(fin14AllCols)} className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                <CheckSquare className="w-3.5 h-3.5" /> Select All
+              </button>
+              <span className="text-gray-300">|</span>
+              <button onClick={() => setFin14SelCols([])} className="text-xs font-semibold text-gray-500 hover:underline flex items-center gap-1">
+                <Square className="w-3.5 h-3.5" /> Clear All
+              </button>
+              <span className="ml-auto text-xs text-gray-400">{fin14SelCols.length} of {fin14AllCols.length} selected</span>
+            </div>
+
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left: column groups */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 border-r border-gray-100">
+                {fin14ColsLoading && <p className="text-center text-gray-400 py-8 text-sm">Loading columns…</p>}
+                {fin14ColGroups.map(group => {
+                  const groupSel = group.cols.filter(c => fin14SelCols.includes(c)).length;
+                  const allGroupSel = groupSel === group.cols.length;
+                  return (
+                    <div key={group.label}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => toggleFin14Group(group.cols, !allGroupSel)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 uppercase tracking-wide hover:text-teal-600">
+                          {allGroupSel
+                            ? <CheckSquare className="w-3.5 h-3.5 text-teal-600" />
+                            : groupSel > 0
+                              ? <div className="w-3.5 h-3.5 border-2 border-teal-400 rounded-sm bg-teal-100" />
+                              : <Square className="w-3.5 h-3.5 text-gray-400" />}
+                          {group.label}
+                        </button>
+                        <span className="text-xs text-gray-400">({groupSel}/{group.cols.length})</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 ml-1">
+                        {group.cols.map(col => {
+                          const order = fin14SelCols.indexOf(col);
+                          return (
+                            <label key={col} className="flex items-center gap-2 text-xs text-gray-700 hover:text-gray-900 cursor-pointer py-0.5">
+                              <input type="checkbox" checked={order >= 0} onChange={() => toggleFin14Col(col)}
+                                className="rounded border-gray-300 text-teal-600 w-3.5 h-3.5" />
+                              <span className="truncate flex-1" title={col}>{col}</span>
+                              {order >= 0 && (
+                                <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-1 rounded flex-shrink-0">#{order + 1}</span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Right: selected order */}
+              <div className="w-56 flex-shrink-0 overflow-y-auto px-3 py-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Export Order</p>
+                {fin14SelCols.length === 0 && (
+                  <p className="text-xs text-gray-300 italic">No columns selected</p>
+                )}
+                <div className="space-y-1">
+                  {fin14SelCols.map((col, i) => (
+                    <div key={col} className="flex items-center gap-1.5 bg-teal-50 rounded px-2 py-1 text-[11px] text-teal-800">
+                      <span className="font-bold text-teal-500 w-4 flex-shrink-0">{i + 1}</span>
+                      <span className="truncate flex-1" title={col}>{col}</span>
+                      <button onClick={() => toggleFin14Col(col)} className="text-teal-300 hover:text-teal-600 flex-shrink-0">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+              <p className="text-xs text-gray-500">
+                Sheet 1: selected columns in order &nbsp;·&nbsp; Sheet 2: child-level pivot summary
+              </p>
+              <a
+                href={fin14SelCols.length > 0 ? `/api/fin14/export-with-fc28?cols=${fin14SelCols.join(",")}` : "/api/fin14/export-with-fc28"}
+                onClick={() => setFin14ColPickerOpen(false)}
+                className="flex items-center gap-2 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition"
+              >
+                <Download className="w-4 h-4" /> Download Excel
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
