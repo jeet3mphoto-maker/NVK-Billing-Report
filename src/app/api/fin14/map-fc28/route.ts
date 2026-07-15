@@ -13,20 +13,29 @@ function sse(data: object) {
 const BATCH_SIZE = 1000; // children per SQL UPDATE
 
 // POST /api/fin14/map-fc28  — streams SSE progress events
+// Body: { batchId?, force? }
+// force=true  → remap ALL rows (even already-mapped ones)
+// force=false → only map rows where Child Status (FC28) is not yet set (default)
 export async function POST(req: NextRequest) {
   const body    = await req.json().catch(() => ({}));
   const batchId: string | undefined = body.batchId;
+  const force: boolean = body.force === true;
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // 1. Collect unique Child IDs from FIN14
-        controller.enqueue(sse({ phase: "init", message: "Collecting Child IDs…" }));
+        // 1. Collect unique Child IDs from unmapped FIN14 rows (or all rows if force)
+        controller.enqueue(sse({ phase: "init", message: force ? "Collecting all Child IDs (force remap)…" : "Collecting unmapped Child IDs…" }));
+
+        // Skip rows already mapped unless force=true
+        const mappedFilter = force ? "" : `AND (COALESCE("rawData"->>'Child Status (FC28)', '') = '')`;
 
         const childIdRows: { childId: string }[] = await prisma.$queryRawUnsafe(
           `SELECT DISTINCT "rawData"->>'Child ID' AS "childId"
            FROM "Fin14Row"
-           ${batchId ? `WHERE "batchId" = $1` : ""}`,
+           WHERE TRUE
+           ${batchId ? `AND "batchId" = $1` : ""}
+           ${mappedFilter}`,
           ...(batchId ? [batchId] : [])
         );
 

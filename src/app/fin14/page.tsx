@@ -503,10 +503,10 @@ export default function Fin14Page() {
 
   const fin14AllCols = fin14ColGroups.flatMap(g => g.cols);
 
-  const mapFC28 = async () => {
+  const mapFC28 = async (force = false) => {
     setMapping(true); setMapResult(null); setMapProgress(null);
     try {
-      const res = await fetch("/api/fin14/map-fc28", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const res = await fetch("/api/fin14/map-fc28", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }) });
       const reader = res.body!.getReader();
       const dec    = new TextDecoder();
       let buf = "";
@@ -642,8 +642,9 @@ export default function Fin14Page() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={mapFC28}
+            onClick={(e) => mapFC28(e.shiftKey)}
             disabled={mapping || !data?.total}
+            title="Click = map unmapped rows only. Shift+Click = force remap all rows."
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm hover:brightness-110 transition-all disabled:opacity-40"
             style={{ background: "#7c3aed" }}
           >
