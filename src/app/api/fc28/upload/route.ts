@@ -174,7 +174,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!batchId) {
-      // Create batch first
+      // Delete all previous batches before creating a new one to keep disk IO low
+      const oldBatches: { id: string }[] = await db.fC28Batch.findMany({ select: { id: true } });
+      for (const old of oldBatches) {
+        await prisma.$executeRawUnsafe(`DELETE FROM "FC28Row" WHERE "batchId" = $1`, old.id);
+        await db.fC28Batch.delete({ where: { id: old.id } });
+      }
+
+      // Create batch
       const batch = await db.fC28Batch.create({
         data: { reportDate: new Date(reportDate), fileCount: 0, rowCount: 0 },
       });

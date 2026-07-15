@@ -67,6 +67,13 @@ export async function POST(req: NextRequest) {
     let batchId: string;
 
     if (!existingBatchId) {
+      // Delete all previous batches to keep disk IO low
+      const oldBatches: { id: string }[] = await (prisma as any).fin14Batch.findMany({ select: { id: true } });
+      for (const old of oldBatches) {
+        await prisma.$executeRawUnsafe(`DELETE FROM "Fin14Row" WHERE "batchId" = $1`, old.id);
+        await (prisma as any).fin14Batch.delete({ where: { id: old.id } });
+      }
+
       // First chunk — create batch with nested rows
       const batch = await (prisma as any).fin14Batch.create({
         data: {
